@@ -6,6 +6,7 @@
 #include <sl/Camera.hpp>
 
 #include "ZEDController.hpp"
+#include "ZEDMultiController.hpp"
 #include "sl/c_api/zed_interface.h"
 
 #define FUNC_MAT_ARGS(name, args) mat_##s(int* ptr, ##args);
@@ -1139,6 +1140,76 @@ extern "C" {
 	}
 
 #endif
+
+	/*************************** MULTI CAM*************************/
+	INTERFACE_API int slmc_init_multi_camera(SL_InitMultiCameraParameters* params) {
+		return (int)ZEDMultiController::get()->open(params);
+	}
+
+
+	INTERFACE_API int slmc_enable_object_detection_fusion(SL_ObjectDetectionFusionParameters* params)
+	{
+		return (int)ZEDMultiController::get()->enableObjectDetectionFusion(params);
+	}
+
+	INTERFACE_API void slmc_disable_object_detection_fusion() {
+		ZEDMultiController::get()->disableObjectDetectionFusion();
+	}
+
+	INTERFACE_API void slmc_close_multi_camera() {
+		ZEDMultiController::get()->close();
+	}
+
+	INTERFACE_API int slmc_add_camera_from_ID(unsigned int usb_id, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param)
+	{
+		return (int)ZEDMultiController::get()->addCameraFromID(usb_id, uuid, translation, rotation, init_camera_param);
+	}
+
+	INTERFACE_API int slmc_add_camera_from_SN(unsigned int serial_number, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param)
+	{
+		return (int)ZEDMultiController::get()->addCameraFromSN(serial_number, uuid, translation, rotation, init_camera_param);
+	}
+
+
+	INTERFACE_API int slmc_add_camera_from_SVO(const char* path_svo, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param)
+	{
+		return (int)ZEDMultiController::get()->addCameraFromSVO(path_svo, uuid, translation, rotation, init_camera_param);
+	}
+
+
+	INTERFACE_API int slmc_add_camera_from_Streaming(const char* ip, unsigned short port, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param)
+	{
+		return (int)ZEDMultiController::get()->addCameraFromStreaming(ip, port, uuid, translation, rotation, init_camera_param);
+	}
+
+
+	INTERFACE_API int slmc_grab(struct SL_RuntimeMultiCameraParameters* runtimeParameters)
+	{
+		return (int)ZEDMultiController::get()->grabAll(runtimeParameters);
+	}
+
+	INTERFACE_API int slmc_retrieve_fused_objects(struct SL_Objects* objects)
+	{
+		return (int)ZEDMultiController::get()->retrieveFusedObjectDetectionData(objects);
+	}
+
+	//provide uuid (uint64_t) returned by slmc_add_xxxx
+	INTERFACE_API int slmc_remove_camera(SL_CameraIdentifier* uuid)
+	{
+		return (int)ZEDMultiController::get()->removeCamera(uuid);
+	}
+
+	/*int enableObjectDetectionFusion(SL_ObjectDetectionFusionParameters* params);
+
+
+	uint64_t addCameraFromUSB(int id, SL_Matrix4f* position);
+	uint64_t addCameraFromSVO(const char* path_svo, SL_Matrix4f* position);
+	uint64_t addCameraFromStreaming(const char* ip, int port, SL_Matrix4f* position);
+
+
+	int grabAll();
+
+	void removeCamera(uint64_t sn);*/
 
     /***************************MAT*************************/
     INTERFACE_API int sl_retrieve_measure(int c_id, int* ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height) {

@@ -1054,6 +1054,53 @@ extern "C" {
 }
 #endif
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////// MULTI CAMERA API //////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+	// Must be called first
+	INTERFACE_API int slmc_init_multi_camera(SL_InitMultiCameraParameters* params);
+	
+	/// WARNING : Must be called BEFORE adding cameras
+	INTERFACE_API int slmc_enable_object_detection_fusion(SL_ObjectDetectionFusionParameters* params);
+
+	/**
+	\brief Disable the object detection module.
+	 */
+	INTERFACE_API void slmc_disable_object_detection_fusion();
+
+	/**
+	\brief Close Multi Camera instance.
+	 */
+	INTERFACE_API void slmc_close_multi_camera();
+	
+	INTERFACE_API int slmc_add_camera_from_ID(unsigned int usb_id, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param);
+
+	INTERFACE_API int slmc_add_camera_from_SN(unsigned int serial_number, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param);
+
+	INTERFACE_API int slmc_add_camera_from_SVO(const char* path_svo, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param);
+
+	INTERFACE_API int slmc_add_camera_from_Streaming(const char* ip, unsigned short port, struct SL_CameraIdentifier* uuid, struct SL_Vector3* rotation, struct SL_Vector3* translation, struct SL_InitCameraParameters init_camera_param);
+	 
+	//Call to grab and sync all cameras
+	INTERFACE_API int slmc_grab(struct SL_RuntimeMultiCameraParameters* runtimeParameters);
+
+	//Call to retrieve a single struc of slobjects (fused)
+	INTERFACE_API int slmc_retrieve_fused_objects(struct SL_Objects* objects);
+
+	INTERFACE_API int slmc_remove_camera(struct SL_CameraIdentifier* uuid);
+	
+
+
+#ifdef __cplusplus
+}
+#endif
+
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif

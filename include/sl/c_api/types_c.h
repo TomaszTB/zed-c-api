@@ -1747,6 +1747,91 @@ struct SL_Rect
 	int height;
 };
 
+struct SL_InputType
+{
+	sl::INPUT_TYPE input_type = sl::INPUT_TYPE::USB;
+	unsigned int serial_number = 0;
+	unsigned int id = 0;
+	const char* svo_path = "";
+	const char*  ip_adress = "";
+	unsigned short port = 0;
+};
+
 #endif
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// MULTI CAM API /////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+struct SL_InitMultiCameraParameters
+{
+	/**
+	the maximum fps of camera data streams. 15 FPS for 2K, etc
+	 */
+	float max_input_fps;
+
+	/**
+	Defines the current maximum distance that can be computed in the defined \ref UNIT.
+	When estimating the depth, the SDK uses this upper limit to turn higher values into \ref TOO_FAR ones.
+	 */
+	float depth_maximum_distance;
+
+	/**
+	Define the chosen camera resolution.\n
+	Available resolutions are listed here: \ref RESOLUTION.
+	\n default : \ref RESOLUTION "RESOLUTION::HD720"
+	 */
+	enum SL_RESOLUTION camera_resolution;
+
+	/**
+	The SDK offers several \ref DEPTH_MODE options offering various levels of performance and accuracy.
+	\n This parameter allows you to set the \ref DEPTH_MODE that best matches your needs.
+	\n default : \ref DEPTH_MODE "DEPTH_MODE::PERFORMANCE"
+	 */
+	enum SL_DEPTH_MODE depth_mode;
+
+	/**
+	This parameter allows you to select the unit to be used for all metric values of the SDK. (depth, point cloud, tracking, mesh, and others).
+	\n default : \ref UNIT "UNIT::MILLIMETER"
+	 */
+	enum SL_UNIT coordinate_units;
+
+	/**
+	Positional tracking, point clouds and many other features require a given \ref COORDINATE_SYSTEM to be used as reference.
+	This parameter allows you to select the \ref COORDINATE_SYSTEM used by the \ref Camera to return its measures.
+	\n This defines the order and the direction of the axis of the coordinate system.
+	\n default : \ref COORDINATE_SYSTEM "COORDINATE_SYSTEM::IMAGE"
+	 */
+	enum SL_COORDINATE_SYSTEM coordinate_system;
+};
+
+struct SL_InitCameraParameters {
+	float depth_maximum_distance;
+	float object_detection_confidence;
+};
+
+//Not available for the moment.
+struct SL_RuntimeMultiCameraParameters
+{
+	bool force_grab_call;
+};
+
+struct SL_ObjectDetectionFusionParameters
+{
+	enum SL_DETECTION_MODEL detection_model;
+
+	/**
+	 * \brief Defines the body format outputed by the sdk when \ref retrieveObjects is called.
+	 * \warning if BODY_FORMAT::POSE_34, the ZED SDK will automatically enable the fitting \ref enable_body_fitting
+	 *
+	 */
+	enum SL_BODY_FORMAT body_format;
+};
+
+struct SL_CameraIdentifier {
+	uint64_t sn;
+};
 
 #endif
