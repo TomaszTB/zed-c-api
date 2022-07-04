@@ -80,7 +80,7 @@ public:
 
 
     /************Tracking*******************/
-    sl::ERROR_CODE enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin, bool set_as_static, bool enable_imu_fusion, const char* area_file_path);
+    sl::ERROR_CODE enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin, bool set_as_static, bool enable_imu_fusion, float depth_min_range, const char* area_file_path);
     sl::POSITIONAL_TRACKING_STATE getPosition(SL_Quaternion *quat, SL_Vector3 *vec, sl::REFERENCE_FRAME mat_type);
     sl::POSITIONAL_TRACKING_STATE getPosition(SL_Quaternion *quat, SL_Vector3 *vec, SL_Vector3 *offset, SL_Quaternion *offsetRotation, int type);
     sl::POSITIONAL_TRACKING_STATE getPosition(SL_PoseData *pose, int reference_frame);
@@ -102,7 +102,13 @@ public:
     bool filterMesh(sl::MeshFilterParameters::MESH_FILTER filterParams, int* numVertices, int* numTriangles, int* numUpdatedSubmeshes, int* updatedIndices, int* numVerticesTot, int* numTrianglesTot, const int maxSubmesh);
     sl::ERROR_CODE retrieveMesh(float* vertices, int* triangles, const int maxSubmesh, float* uvs, unsigned char* texturePtr);
     sl::ERROR_CODE updateChunks(int* numVertices, int* numTriangles, int* numSubmeshes, int* updatedIndices, int* numVerticesTot, int* numTrianglesTot, const int maxSubmesh);
-    sl::ERROR_CODE retrieveChunks(const int maxSubmesh, float* vertices, int* triangles);
+    sl::ERROR_CODE retrieveChunks(const int maxSubmesh, float* vertices, int* triangles, float* uvs, unsigned char* texturePtr);
+
+    sl::ERROR_CODE updateWholeMesh(int* nb_vertices, int* nb_triangles);
+    sl::ERROR_CODE retrieveWholeMesh(float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr);
+    bool loadWholeMesh(const char* filename, int* nb_vertices, int* nb_triangles, int* texture_size);
+    bool applyWholeTexture(int* nb_vertices, int* nb_triangles, int* texture_size);
+    bool filterWholeMesh(sl::MeshFilterParameters::MESH_FILTER filter_param, int* nb_vertices, int* nb_triangles);
 
     sl::ERROR_CODE updateFusedPointCloud(int* numPointsTot);
     sl::ERROR_CODE retrieveFusedPointCloud(float* vertices);

@@ -394,6 +394,8 @@ enum SL_VIDEO_SETTINGS {
 	SL_VIDEO_SETTINGS_LAST
 };
 
+const int SL_VIDEO_SETTINGS_VALUE_AUTO = -1;
+
 /**
 \brief Lists retrievable measures.
 */
@@ -402,41 +404,41 @@ enum SL_MEASURE {
 	SL_MEASURE_DEPTH, /** Depth map. In SL_UNIT defined in SL_InitParameters. Each pixel contains 1 float. SL_MAT_TYPE_F32_C1.*/
 	SL_MEASURE_CONFIDENCE, /** Certainty/confidence of the depth map. Each pixel contains 1 float. SL_MAT_TYPE_F32_C1.*/
 	SL_MEASURE_XYZ, /** Point cloud. Each pixel contains 4 float (X, Y, Z, not used). SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZRGBA, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the RGBA color.  SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZBGRA, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the BGRA color.  SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZARGB, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the ARGB color.  SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZABGR, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the ABGR color.  SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZRGBA, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the RGBA color.  SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZBGRA, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the BGRA color.  SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZARGB, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the ARGB color.  SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZABGR, /** Colored point cloud. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the ABGR color.  SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_NORMALS, /** Normals vector. Each pixel contains 4 float (X, Y, Z, 0).  SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_DISPARITY_RIGHT, /**< Disparity map for right sensor. Each pixel contains 1 float. SL_MAT_TYPE_F32_C1.*/
 	SL_MEASURE_DEPTH_RIGHT, /** Depth map for right sensor. Each pixel contains 1 float. SL_MAT_TYPE_F32_C1.*/
 	SL_MEASURE_XYZ_RIGHT, /** Point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, not used). SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZRGBA_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the RGBA color. SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZBGRA_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the BGRA color. SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZARGB_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the ARGB color. SL_MAT_TYPE_F32_C4.*/
-	SL_MEASURE_XYZABGR_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an usigned char[4] representing the ABGR color. SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZRGBA_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the RGBA color. SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZBGRA_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the BGRA color. SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZARGB_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the ARGB color. SL_MAT_TYPE_F32_C4.*/
+	SL_MEASURE_XYZABGR_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the ABGR color. SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_NORMALS_RIGHT, /** Normals vector for right view. Each pixel contains 4 float (X, Y, Z, 0).  SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_DEPTH_U16_MM, /** Depth map in millimeter whatever the SL_UNIT defined in SL_InitParameters. Invalid values are set to 0, depth values are clamped at 65000.  Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
-	SL_MEASURE_DEPTH_U16_MM_RIGHT, /** Depth map in millimeter for right sensor. Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
+	SL_MEASURE_DEPTH_U16_MM_RIGHT /** Depth map in millimeter for right sensor. Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
 };
 
 /**
 \brief Lists available views.
  */
 enum SL_VIEW {
-	SL_VIEW_LEFT, /** Left BGRA image. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4.  */
-	SL_VIEW_RIGHT, /** Right BGRA image. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_LEFT_GRAY, /** Left GRAY image. Each pixel contains 1 usigned char. SL_MAT_TYPE_U8_C1. */
-	SL_VIEW_RIGHT_GRAY, /** Right GRAY image. Each pixel contains 1 usigned char. SL_MAT_TYPE_U8_C1. */
-	SL_VIEW_LEFT_UNRECTIFIED, /** Left BGRA unrectified image. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_RIGHT_UNRECTIFIED, /** Right BGRA unrectified image. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_LEFT_UNRECTIFIED_GRAY, /** Left GRAY unrectified image. Each pixel contains 1 usigned char. SL_MAT_TYPE_U8_C1. */
-	SL_VIEW_RIGHT_UNRECTIFIED_GRAY, /** Right GRAY unrectified image. Each pixel contains 1 usigned char. SL_MAT_TYPE_U8_C1. */
-	SL_VIEW_SIDE_BY_SIDE, /** Left and right image (the image width is therefore doubled). Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_DEPTH, /** Color rendering of the depth. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. Use \ref MEASURE "MEASURE_DEPTH" with \ref Camera.retrieveMeasure() to get depth values.*/
-	SL_VIEW_CONFIDENCE, /** Color rendering of the depth confidence. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_NORMALS, /** Color rendering of the normals. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_DEPTH_RIGHT, /** Color rendering of the right depth mapped on right sensor. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_NORMALS_RIGHT, /** Color rendering of the normals mapped on right sensor. Each pixel contains 4 usigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_LEFT, /** Left BGRA image. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4.  */
+	SL_VIEW_RIGHT, /** Right BGRA image. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_LEFT_GRAY, /** Left GRAY image. Each pixel contains 1 unsigned char. SL_MAT_TYPE_U8_C1. */
+	SL_VIEW_RIGHT_GRAY, /** Right GRAY image. Each pixel contains 1 unsigned char. SL_MAT_TYPE_U8_C1. */
+	SL_VIEW_LEFT_UNRECTIFIED, /** Left BGRA unrectified image. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_RIGHT_UNRECTIFIED, /** Right BGRA unrectified image. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_LEFT_UNRECTIFIED_GRAY, /** Left GRAY unrectified image. Each pixel contains 1 unsigned char. SL_MAT_TYPE_U8_C1. */
+	SL_VIEW_RIGHT_UNRECTIFIED_GRAY, /** Right GRAY unrectified image. Each pixel contains 1 unsigned char. SL_MAT_TYPE_U8_C1. */
+	SL_VIEW_SIDE_BY_SIDE, /** Left and right image (the image width is therefore doubled). Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_DEPTH, /** Color rendering of the depth. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. Use \ref MEASURE "MEASURE_DEPTH" with \ref Camera.retrieveMeasure() to get depth values.*/
+	SL_VIEW_CONFIDENCE, /** Color rendering of the depth confidence. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_NORMALS, /** Color rendering of the normals. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_DEPTH_RIGHT, /** Color rendering of the right depth mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_NORMALS_RIGHT /** Color rendering of the normals mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
 };
 
 /**
@@ -633,6 +635,7 @@ enum SL_DETECTION_MODEL {
 	SL_DETECTION_MODEL_MULTI_CLASS_BOX_MEDIUM, /**< Any objects, bounding box based, compromise between accuracy and speed */
 	SL_DETECTION_MODEL_HUMAN_BODY_MEDIUM, /**<  Keypoints based, specific to human skeleton, compromise between accuracy and speed */
 	SL_DETECTION_MODEL_PERSON_HEAD_BOX, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environement, the person localization is also improved */
+	SL_DETECTION_MODEL_PERSON_HEAD_BOX_ACCURATE, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environments, the person localization is also improved, state of the art accuracy */
 	SL_DETECTION_MODEL_CUSTOM_BOX_OBJECTS /**< For external inference, using your own custom model and/or frameworks. This mode disable the internal inference engine, the 2D bounding box detection must be provided */
 };
 
@@ -647,6 +650,7 @@ enum SL_AI_MODELS {
 	SL_AI_MODELS_HUMAN_BODY_MEDIUM_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_MEDIUM
 	SL_AI_MODELS_HUMAN_BODY_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_ACCURATE
 	SL_AI_MODELS_PERSON_HEAD_DETECTION, // related to sl::DETECTION_MODEL::PERSON_HEAD_BOX
+	SL_AI_MODELS_PERSON_HEAD_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::PERSON_HEAD_BOX_ACCURATE
 	SL_AI_MODELS_REID_ASSOCIATION, // related to sl::BatchParameters::enable
 	SL_AI_MODELS_NEURAL_DEPTH, // related to sl::DEPTH_MODE::NEURAL
 	SL_AI_MODELS_LAST
@@ -785,6 +789,7 @@ struct SL_InitParameters
 	This parameter allows you to select to desired input.
 	*/
 	enum  SL_INPUT_TYPE input_type;
+
 	/**
 	Define the chosen camera resolution. Small resolutions offer higher framerate and lower computation time (SL_RESOLUTION).\n
 	In most situations, the \ref RESOLUTION "RESOLUTION_HD720" at 60 fps is the best balance between image quality and framerate.\n
@@ -792,6 +797,7 @@ struct SL_InitParameters
 	\n default : \ref RESOLUTION "RESOLUTION_HD720"
 	 */
 	enum  SL_RESOLUTION resolution;
+
 	/**
 	Requested camera frame rate. If set to 0, the highest FPS of the specified \ref camera_resolution will be used.\n
 	See \ref RESOLUTION for a list of supported framerates.
@@ -799,26 +805,29 @@ struct SL_InitParameters
 	\note If the requested camera_fps is unsupported, the closest available FPS will be used.
 	 */
 	int camera_fps;
+
 	/**
 	Id of the Camera.
 	*/
 	int camera_device_id;
+
 	/**
 	If you are using the camera upside down, setting this parameter to FLIP_MODE_ON will cancel its rotation. The images will be horizontally flipped.
 	\n default : FLIP_MODE_AUTO
-	 * From ZED SDK 3.2 a new FLIP_MODE enum was introduced to add the automatic flip mode detection based on the IMU gravity detection. This only works for ZED-M or ZED2 cameras.
-	 */
+	* From ZED SDK 3.2 a new FLIP_MODE enum was introduced to add the automatic flip mode detection based on the IMU gravity detection. This only works for ZED-M or ZED2 cameras.
+	*/
 	enum  SL_FLIP_MODE camera_image_flip;
+
 	/**
 	At initialization, the \ref Camera runs a self-calibration process that corrects small offsets from the device's factory calibration.\n
-	A drawback is that calibration parameters will slightly change from one run to another, which can be an issue for repeatability.\n
-	If set to true, self-calibration will be disabled and calibration parameters won't be optimized.\n
+	A drawback is that calibration parameters will slightly change from one (live) run to another, which can be an issue for repeatability.\n
+	If set to true, self-calibration will be disabled and calibration parameters won't be optimized, raw calibration parameters from the conf file will be used\n
 	default : false
 	\note In most situations, self calibration should remain enabled.
 	\note You can also trigger the self-calibration at anytime after open() by calling \ref Camera::UpdateSelfCalibration(), even if this parameter is set to true.
-
 	 */
 	bool camera_disable_self_calib;
+
 	/**
 	By default, the SDK only computes a single depth map, aligned with the left camera image.\n
 	This parameter allows you to enable the \ref MEASURE "MEASURE_DEPTH_RIGHT" and other \ref MEASURE "MEASURE_<XXX>_RIGHT" at the cost of additional computation time.\n
@@ -844,11 +853,11 @@ struct SL_InitParameters
 	enum SL_DEPTH_MODE depth_mode;
 	/**
 	Regions of the generated depth map can oscillate from one frame to another. These oscillations result from a lack of texture (too homogeneous) on an object and by image noise.
-	\n This parameter enables a stabilization filter that reduces these oscillations.
-	\n default : true
-	\note The stabilization uses the positional tracking to increase its accuracy, so the Positional Tracking module will be enabled automatically when set to true.\n
+	\n This parameter control a stabilization filter that reduces these oscillations. In the range [0-100], 0 is disable (raw depth), smoothness is linear from 1 to 100.
+	\n default : 1
+	\note The stabilization uses the positional tracking to increase its accuracy, so the Positional Tracking module will be enabled automatically when set to a value different from 0.\n
 	 */
-	bool depth_stabilization;
+	int depth_stabilization;
 	/**
 	This parameter allows you to specify the minimum depth value (from the camera) that will be computed, measured in the \ref UNIT you define.
 	\n In stereovision (the depth technology used by the camera), looking for closer depth values can have a slight impact on performance and memory consumption.
@@ -960,7 +969,6 @@ struct SL_RuntimeParameters
 	\n Decreasing this value will remove depth data from image areas which are uniform.
 	 */
 	int texture_confidence_threshold;
-
     /**
      Defines if the saturated area (Luminance>=255) must be removed from depth map estimation
      \n True by default
@@ -1173,6 +1181,12 @@ struct SL_PositionalTrackingParameters
 	\note This setting has no impact on the tracking of a ZED camera; only the ZED Mini uses a built-in IMU.
 		*/
 	bool enable_imu_fusion;
+	/**
+	 * This setting allows you to change the minimum depth used by the SDK for Positional Tracking. It may be useful for example
+	 * if any steady objects are in front of the camera and may perturbate the positional tracking algorithm.
+	 * default : -1 which means no minimum depth
+	 */
+	float depth_min_range;
 };
 
 /**
@@ -1506,6 +1520,12 @@ struct SL_ObjectDetectionRuntimeParameters
 	 * ObjectDetectionRuntimeParameters::detection_confidence_threshold will be taken as fallback/default value
 	 */
 	int object_confidence_threshold[(int)SL_OBJECT_CLASS_LAST];
+	/**
+	\brief Defines the minimum keypoints threshold.
+	 * the SDK will outputs skeletons with more keypoints than this threshold
+	 * it is useful for example to remove unstable fitting results when a skeleton is partially occluded
+	 */
+	int minimum_keypoints_threshold;
 };
 
 /**
@@ -1571,6 +1591,10 @@ struct SL_ObjectData
 	 * Defined in \ref sl:InitParameters::UNIT / seconds, expressed in \ref RuntimeParameters::measure3D_reference_frame.
 	 */
 	struct SL_Vector3 velocity;
+	/**
+	 * \brief 3D object dimensions: width, height, length. Defined in SL_InitParameters_UNIT, expressed in SL_RuntimeParameters::measure3D_reference_frame.
+	 */
+	struct SL_Vector3 dimensions;
 	/**
 	 * \brief 3D bounding box of the person represented as eight 3D points
 	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.

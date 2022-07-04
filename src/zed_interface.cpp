@@ -295,7 +295,6 @@ extern "C" {
     }
 
     INTERFACE_API int sl_open_camera(int id, SL_InitParameters *init_parameters, const char* path_svo, const char* ip, int stream_port, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path) {
-
         int err = (int) sl::ERROR_CODE::CAMERA_NOT_DETECTED;
         if (init_parameters->input_type == (SL_INPUT_TYPE) sl::INPUT_TYPE::USB) {
             err = ZEDController::get(id)->initFromUSB(init_parameters, output_file, opt_settings_path, opencv_calib_path);
@@ -304,28 +303,16 @@ extern "C" {
         } else if (init_parameters->input_type == (SL_INPUT_TYPE) sl::INPUT_TYPE::STREAM) {
             err = ZEDController::get(id)->initFromStream(init_parameters, ip, stream_port, output_file, opt_settings_path, opencv_calib_path);
         }
-
-        if (err == (int) sl::ERROR_CODE::SUCCESS) {
-            int width = 384;
-            int height = 192;
-
-            if (init_parameters->depth_mode == (SL_DEPTH_MODE) sl::DEPTH_MODE::PERFORMANCE) {
-                width = 384;
-                height = 192;
-            } else if (init_parameters->depth_mode == (SL_DEPTH_MODE) sl::DEPTH_MODE::QUALITY) {
-                width = 512;
-                height = 288;
-            } else if (init_parameters->depth_mode == (SL_DEPTH_MODE) sl::DEPTH_MODE::ULTRA) {
-                width = 1280;
-                height = 704;
-            }
-
-        }
         return err;
     }
 
 	INTERFACE_API bool sl_is_opened(int c_id) {
 		return  ZEDController::get(c_id)->zed.isOpened();
+	}
+
+	INTERFACE_API CUcontext sl_get_cuda_context(int c_id)
+	{
+		return  ZEDController::get(c_id)->zed.getCUDAContext();
 	}
 
     INTERFACE_API SL_InitParameters* sl_get_init_parameters(int c_id) {
@@ -721,7 +708,7 @@ extern "C" {
     INTERFACE_API int sl_enable_positional_tracking(int c_id, SL_PositionalTrackingParameters * tracking_param, const char * area_path) {
         if (!ZEDController::get(c_id)->isNull()) {
             return (int) ZEDController::get(c_id)->enableTracking(&tracking_param->initial_world_rotation, &tracking_param->initial_world_position, tracking_param->enable_area_memory, tracking_param->enable_pose_smothing, tracking_param->set_floor_as_origin,
-                    tracking_param->set_as_static, tracking_param->enable_imu_fusion, area_path);
+                    tracking_param->set_as_static, tracking_param->enable_imu_fusion, tracking_param->depth_min_range, area_path);
         } else
             return (int) sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
@@ -891,9 +878,9 @@ extern "C" {
             return -1;
     }
 
-    INTERFACE_API int sl_retrieve_chunks(int c_id, float* vertices, int* triangles, const int maxSubmesh) {
+    INTERFACE_API int sl_retrieve_chunks(int c_id, float* vertices, int* triangles, float* uvs, unsigned char* texturePtr, const int maxSubmesh) {
         if (!ZEDController::get(c_id)->isNull())
-            return (int) ZEDController::get(c_id)->retrieveChunks(maxSubmesh, vertices, triangles);
+            return (int) ZEDController::get(c_id)->retrieveChunks(maxSubmesh, vertices, triangles, uvs, texturePtr);
         else
             return -1;
     }
@@ -952,8 +939,45 @@ extern "C" {
             return ZEDController::get(c_id)->filterMesh((sl::MeshFilterParameters::MESH_FILTER)filter_params, nb_vertices, nb_triangles, nb_updated_submeshes, updated_indices, nb_vertices_tot, nb_triangles_tot, max_submesh);
         else
             return false;
-
     }
+
+    INTERFACE_API int sl_update_whole_mesh(int c_id, int* nb_vertices, int* nb_triangles) {
+        if (!ZEDController::get(c_id)->isNull())
+            return (int)ZEDController::get(c_id)->updateWholeMesh(nb_vertices, nb_triangles);
+        else
+            return false;
+    }
+
+    INTERFACE_API int sl_retrieve_whole_mesh(int c_id, float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr) {
+        if (!ZEDController::get(c_id)->isNull())
+            return (int)ZEDController::get(c_id)->retrieveWholeMesh(vertices, triangles, uvs, texture_ptr);
+        else
+            return false;
+    }
+
+    INTERFACE_API bool sl_load_whole_mesh(int c_id, const char* filename, int* nb_vertices, int* nb_triangles, int* textures_size) {
+        if (!ZEDController::get(c_id)->isNull())
+            return ZEDController::get(c_id)->loadWholeMesh(filename, nb_vertices, nb_triangles, textures_size);
+        else
+            return false;
+    }
+
+    INTERFACE_API bool sl_apply_whole_texture(int c_id, int* nb_vertices, int* nb_triangles, int* textures_size) {
+        if (!ZEDController::get(c_id)->isNull())
+            return ZEDController::get(c_id)->applyWholeTexture(nb_vertices, nb_triangles, textures_size);
+        else
+            return false;
+    }
+
+    INTERFACE_API bool sl_filter_whole_mesh(int c_id, enum SL_MESH_FILTER filter_params, int* nb_vertices, int* nb_triangles) {
+        if (!ZEDController::get(c_id)->isNull())
+            return ZEDController::get(c_id)->filterWholeMesh((sl::MeshFilterParameters::MESH_FILTER)filter_params, nb_vertices, nb_triangles);
+        else
+            return false;
+    }
+
+
+
 
     /*********************************************** Plane Detection functions ***********************************/
 
@@ -1141,47 +1165,47 @@ extern "C" {
 #endif
 
     /***************************MAT*************************/
-    INTERFACE_API int sl_retrieve_measure(int c_id, int* ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height) {
+    INTERFACE_API int sl_retrieve_measure(int c_id, void* ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height) {
         if (!ZEDController::get(c_id)->isNull()) {
             return (int) ZEDController::get(c_id)->zed.retrieveMeasure(*MAT, (sl::MEASURE)type, (sl::MEM)(mem + 1), sl::Resolution(width, height));
         }
         return (int) sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
 
-    INTERFACE_API int sl_retrieve_image(int c_id, int* ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height) {
+    INTERFACE_API int sl_retrieve_image(int c_id, void* ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height) {
         if (!ZEDController::get(c_id)->isNull()) {
             return (int) ZEDController::get(c_id)->zed.retrieveImage(*MAT, (sl::VIEW)type, (sl::MEM)(mem + 1), sl::Resolution(width, height));
         }
         return (int) sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
 
-    INTERFACE_API int* sl_mat_create_new(int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem) {
-        return (int*) (new sl::Mat(sl::Resolution(width, height), (sl::MAT_TYPE)type, (sl::MEM)(mem + 1)));
+    INTERFACE_API void* sl_mat_create_new(int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem) {
+        return (void*) (new sl::Mat(sl::Resolution(width, height), (sl::MAT_TYPE)type, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int* sl_mat_create_new_empty() {
-        return (int*) (new sl::Mat());
+    INTERFACE_API void* sl_mat_create_new_empty() {
+        return (void*) (new sl::Mat());
     }
 
-    INTERFACE_API bool sl_mat_is_init(int* ptr) {
+    INTERFACE_API bool sl_mat_is_init(void* ptr) {
         return MAT->isInit();
     }
 
-    INTERFACE_API void sl_mat_free(int* ptr, enum SL_MEM mem) {
+    INTERFACE_API void sl_mat_free(void* ptr, enum SL_MEM mem) {
         MAT->free((sl::MEM)(mem + 1));
         if (ptr != nullptr) delete ptr;
     }
 
-    INTERFACE_API void sl_mat_get_infos(int* ptr, char* buffer) {
+    INTERFACE_API void sl_mat_get_infos(void* ptr, char* buffer) {
         strcpy(buffer, MAT->getInfos().c_str());
     }
     // GET
 
-    INTERFACE_API int sl_mat_get_value_uchar(int* ptr, int col, int raw, unsigned char* value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_uchar(void* ptr, int col, int raw, unsigned char* value, enum SL_MEM mem) {
         return (int) (MAT->getValue<unsigned char>(col, raw, value, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_get_value_uchar2(int* ptr, int col, int raw, SL_Uchar2* value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_uchar2(void* ptr, int col, int raw, SL_Uchar2* value, enum SL_MEM mem) {
         sl::uchar2 u;
         int err = (int) (MAT->getValue<sl::uchar2>(col, raw, &u, (sl::MEM)(mem + 1)));
         value->x = u.x;
@@ -1190,7 +1214,7 @@ extern "C" {
         return err;
     }
 
-    INTERFACE_API int sl_mat_get_value_uchar3(int* ptr, int x, int y, SL_Uchar3 * value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_uchar3(void* ptr, int x, int y, SL_Uchar3 * value, enum SL_MEM mem) {
         sl::uchar3 u;
         int err = (int) (MAT->getValue<sl::uchar3>(x, y, &u, (sl::MEM)(mem + 1)));
         value->x = u.x;
@@ -1200,7 +1224,7 @@ extern "C" {
         return err;
     }
 
-    INTERFACE_API int sl_mat_get_value_uchar4(int* ptr, int x, int y, SL_Uchar4 * value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_uchar4(void* ptr, int x, int y, SL_Uchar4 * value, enum SL_MEM mem) {
         sl::uchar4 u;
         int err = (int) (MAT->getValue<sl::uchar4>(x, y, &u, (sl::MEM)(mem + 1)));
 
@@ -1212,11 +1236,11 @@ extern "C" {
         return err;
     }
 
-    INTERFACE_API int sl_mat_get_value_float(int* ptr, int x, int y, float* value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_float(void* ptr, int x, int y, float* value, enum SL_MEM mem) {
         return (int) (MAT->getValue<float>(x, y, value, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_get_value_float2(int* ptr, int x, int y, SL_Vector2 * value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_float2(void* ptr, int x, int y, SL_Vector2 * value, enum SL_MEM mem) {
         sl::float2 f;
         int err = (int) (MAT->getValue<sl::float2>(x, y, &f, (sl::MEM)(mem + 1)));
         value->x = f.x;
@@ -1225,7 +1249,7 @@ extern "C" {
         return err;
     }
 
-    INTERFACE_API int sl_mat_get_value_float3(int* ptr, int x, int y, SL_Vector3 * value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_float3(void* ptr, int x, int y, SL_Vector3 * value, enum SL_MEM mem) {
         sl::float3 f;
         int err = (int) (MAT->getValue<sl::float3>(x, y, &f, (sl::MEM)(mem + 1)));
         value->x = f.x;
@@ -1235,7 +1259,7 @@ extern "C" {
         return err;
     }
 
-    INTERFACE_API int sl_mat_get_value_float4(int* ptr, int x, int y, SL_Vector4 * value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_get_value_float4(void* ptr, int x, int y, SL_Vector4 * value, enum SL_MEM mem) {
         sl::float4 f;
         int err = (int) (MAT->getValue<sl::float4>(x, y, &f, (sl::MEM)(mem + 1)));
         value->x = f.x;
@@ -1248,145 +1272,149 @@ extern "C" {
 
     // SET
 
-    INTERFACE_API int sl_mat_set_value_uchar(int* ptr, int x, int y, unsigned char value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_uchar(void* ptr, int x, int y, unsigned char value, enum SL_MEM mem) {
         return (int) (MAT->setValue<unsigned char>(x, y, value, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_value_uchar2(int* ptr, int x, int y, SL_Uchar2 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_uchar2(void* ptr, int x, int y, SL_Uchar2 value, enum SL_MEM mem) {
         sl::uchar2 u = sl::uchar2(value.x, value.y);
         return (int) (MAT->setValue<sl::uchar2>(x, y, u, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_value_uchar3(int* ptr, int x, int y, SL_Uchar3 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_uchar3(void* ptr, int x, int y, SL_Uchar3 value, enum SL_MEM mem) {
         sl::uchar3 u = sl::uchar3(value.x, value.y, value.z);
         return (int) (MAT->setValue<sl::uchar3>(x, y, u, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_value_uchar4(int* ptr, int x, int y, SL_Uchar4 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_uchar4(void* ptr, int x, int y, SL_Uchar4 value, enum SL_MEM mem) {
         sl::uchar4 f = sl::uchar4(value.x, value.y, value.z, value.w);
         return (int) (MAT->setValue<sl::uchar4>(x, y, f, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_value_float(int* ptr, int x, int y, float value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_float(void* ptr, int x, int y, float value, enum SL_MEM mem) {
         return (int) (MAT->setValue<float>(x, y, value, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_value_float2(int* ptr, int x, int y, SL_Vector2 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_float2(void* ptr, int x, int y, SL_Vector2 value, enum SL_MEM mem) {
         sl::float2 f = sl::float2(value.x, value.y);
         return (int) (MAT->setValue<sl::float2>(x, y, f, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_value_float3(int* ptr, int x, int y, SL_Vector3 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_float3(void* ptr, int x, int y, SL_Vector3 value, enum SL_MEM mem) {
         sl::float3 f = sl::float3(value.x, value.y, value.z);
         return (int) (MAT->setValue<sl::float3>(x, y, f, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_value_float4(int* ptr, int x, int y, SL_Vector4 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_value_float4(void* ptr, int x, int y, SL_Vector4 value, enum SL_MEM mem) {
         sl::float4 f = sl::float4(value.x, value.y, value.z, value.w);
         return (int) (MAT->setValue<sl::float4>(x, y, f, (sl::MEM)(mem + 1)));
     }
     // SET TO
 
-    INTERFACE_API int sl_mat_set_to_uchar(int* ptr, unsigned char value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_uchar(void* ptr, unsigned char value, enum SL_MEM mem) {
         return (int) (MAT->setTo<unsigned char>(value, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_to_uchar2(int* ptr, SL_Uchar2 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_uchar2(void* ptr, SL_Uchar2 value, enum SL_MEM mem) {
         sl::uchar2 f = sl::uchar2(value.x, value.y);
         return (int) (MAT->setTo<sl::uchar2>(f, (sl::MEM)(mem + 1)));
 
     }
 
-    INTERFACE_API int sl_mat_set_to_uchar3(int* ptr, SL_Uchar3 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_uchar3(void* ptr, SL_Uchar3 value, enum SL_MEM mem) {
         sl::uchar3 f = sl::uchar3(value.x, value.y, value.z);
         return (int) (MAT->setTo<sl::uchar3>(f, (sl::MEM)(mem + 1)));
 
     }
 
-    INTERFACE_API int sl_mat_set_to_uchar4(int* ptr, SL_Uchar4 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_uchar4(void* ptr, SL_Uchar4 value, enum SL_MEM mem) {
         sl::uchar4 f = sl::uchar4(value.x, value.y, value.z, value.w);
         return (int) (MAT->setTo<sl::uchar4>(f, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_set_to_float(int* ptr, float value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_float(void* ptr, float value, enum SL_MEM mem) {
         return (int) (MAT->setTo<float>(value, (sl::MEM)(mem + 1)));
 
     }
 
-    INTERFACE_API int sl_mat_set_to_float2(int* ptr, SL_Vector2 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_float2(void* ptr, SL_Vector2 value, enum SL_MEM mem) {
         sl::float2 f = sl::float2(value.x, value.y);
         return (int) (MAT->setTo<sl::float2>(f, (sl::MEM)(mem + 1)));
 
     }
 
-    INTERFACE_API int sl_mat_set_to_float3(int* ptr, SL_Vector3 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_float3(void* ptr, SL_Vector3 value, enum SL_MEM mem) {
         sl::float3 f = sl::float3(value.x, value.y, value.z);
         return (int) (MAT->setTo<sl::float3>(f, (sl::MEM)(mem + 1)));
 
     }
 
-    INTERFACE_API int sl_mat_set_to_float4(int* ptr, SL_Vector4 value, enum SL_MEM mem) {
+    INTERFACE_API int sl_mat_set_to_float4(void* ptr, SL_Vector4 value, enum SL_MEM mem) {
         sl::float4 f = sl::float4(value.x, value.y, value.z, value.w);
         return (int) (MAT->setTo<sl::float4>(f, (sl::MEM)(mem + 1)));
     }
 
-    INTERFACE_API int sl_mat_update_cpu_from_gpu(int* ptr) {
+    INTERFACE_API int sl_mat_update_cpu_from_gpu(void* ptr) {
         return (int) MAT->updateCPUfromGPU();
     }
 
-    INTERFACE_API int sl_mat_update_gpu_from_cpu(int* ptr) {
+    INTERFACE_API int sl_mat_update_gpu_from_cpu(void* ptr) {
         return (int) MAT->updateGPUfromCPU();
     }
 
-    INTERFACE_API int sl_mat_copy_to(int* ptr, int* ptrDest, enum SL_COPY_TYPE cpyType) {
+    INTERFACE_API int sl_mat_copy_to(void* ptr, void* ptrDest, enum SL_COPY_TYPE cpyType) {
         return (int) MAT->copyTo(*(sl::Mat*)ptrDest, (sl::COPY_TYPE)cpyType);
     }
 
-    INTERFACE_API int sl_mat_read(int* ptr, const char* filePath) {
+    INTERFACE_API int sl_mat_read(void* ptr, const char* filePath) {
         return (int) MAT->read(filePath);
     }
 
-    INTERFACE_API int sl_mat_write(int* ptr, const char* filePath) {
+    INTERFACE_API int sl_mat_write(void* ptr, const char* filePath) {
         return (int) (MAT->write(filePath));
     }
 
-    INTERFACE_API int sl_mat_get_width(int* ptr) {
+    INTERFACE_API int sl_mat_get_width(void* ptr) {
         return MAT->getWidth();
     }
 
-    INTERFACE_API int sl_mat_get_height(int* ptr) {
+    INTERFACE_API int sl_mat_get_height(void* ptr) {
         return MAT->getHeight();
     }
 
-    INTERFACE_API int sl_mat_get_channels(int* ptr) {
+    INTERFACE_API int sl_mat_get_channels(void* ptr) {
         return MAT->getChannels();
     }
 
-    INTERFACE_API int sl_mat_get_memory_type(int* ptr) {
-        return (int) (MAT->getMemoryType());
+    INTERFACE_API int sl_mat_get_memory_type(void* ptr) {
+        return (int) (MAT->getMemoryType()) - 1;
     }
 
-    INTERFACE_API int sl_mat_get_pixel_bytes(int* ptr) {
+    INTERFACE_API int sl_mat_get_data_type(void* ptr) {
+        return (int)(MAT->getDataType());
+    }
+
+    INTERFACE_API int sl_mat_get_pixel_bytes(void* ptr) {
         return MAT->getPixelBytes();
     }
 
-    INTERFACE_API int sl_mat_get_step(int* ptr) {
-        return MAT->getStep();
+    INTERFACE_API int sl_mat_get_step(void* ptr, enum SL_MEM mem) {
+        return MAT->getStep((sl::MEM)(mem +1));
     }
 
-    INTERFACE_API int sl_mat_get_step_bytes(int* ptr) {
-        return MAT->getStepBytes();
+    INTERFACE_API int sl_mat_get_step_bytes(void* ptr, enum SL_MEM mem) {
+        return MAT->getStepBytes((sl::MEM)(mem + 1));
     }
 
-    INTERFACE_API int sl_mat_get_width_bytes(int* ptr) {
+    INTERFACE_API int sl_mat_get_width_bytes(void* ptr) {
         return MAT->getWidthBytes();
     }
 
-    INTERFACE_API bool sl_mat_is_memory_owner(int* ptr) {
+    INTERFACE_API bool sl_mat_is_memory_owner(void* ptr) {
         return MAT->isMemoryOwner();
     }
 
-    INTERFACE_API SL_Resolution sl_mat_get_resolution(int* ptr) {
+    INTERFACE_API SL_Resolution sl_mat_get_resolution(void* ptr) {
         sl::Resolution sl_res = MAT->getResolution();
         SL_Resolution c_res;
         c_res.height = sl_res.height;
@@ -1394,20 +1422,24 @@ extern "C" {
         return c_res;
     }
 
-    INTERFACE_API void sl_mat_alloc(int* ptr, int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem) {
+    INTERFACE_API void sl_mat_alloc(void* ptr, int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem) {
         MAT->alloc(width, height, (sl::MAT_TYPE)type, (sl::MEM)(mem + 1));
     }
 
-    INTERFACE_API int sl_mat_set_from(int* ptr, int* ptrSource, enum SL_COPY_TYPE copyType) {
+    INTERFACE_API int sl_mat_set_from(void* ptr, void* ptrSource, enum SL_COPY_TYPE copyType) {
         return (int) MAT->setFrom(*(sl::Mat*)ptrSource, (sl::COPY_TYPE)copyType);
     }
 
-    INTERFACE_API int* sl_mat_get_ptr(int* ptr, enum SL_MEM mem) {
+    INTERFACE_API int* sl_mat_get_ptr(void* ptr, enum SL_MEM mem) {
         return (int*) MAT->getPtr<sl::uchar1>((sl::MEM)(mem + 1));
     }
 
-    INTERFACE_API void sl_mat_clone(int* ptr, int* ptrSource) {
-        MAT->clone(*(sl::Mat*)ptrSource);
+    INTERFACE_API int sl_mat_clone(void* ptr, void* ptrSource) {
+        return (int)MAT->clone(*(sl::Mat*)ptrSource);
+    }
+
+    INTERFACE_API void sl_mat_swap(void* ptr_1, void* ptr_2) {
+        sl::Mat::swap(*(sl::Mat*)ptr_1, *(sl::Mat*)ptr_2);
     }
 
 #ifdef __cplusplus

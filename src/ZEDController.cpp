@@ -12,7 +12,7 @@ inline bool checkKPvalidity(sl::float4 &kp, double render_threshold) {
     return (std::isnormal(kp.w) && kp.w > render_threshold);
 }
 
-ZEDController* ZEDController::instance[MAX_CAMERA_PLUGIN] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr , nullptr, nullptr, nullptr, nullptr , nullptr, nullptr, nullptr, nullptr , nullptr, nullptr, nullptr, nullptr};
+ZEDController* ZEDController::instance[MAX_CAMERA_PLUGIN] = {nullptr, nullptr, nullptr, nullptr};
 
 ZEDController::ZEDController(int i) {
     input_type = -1;
@@ -259,6 +259,7 @@ SL_PositionalTrackingParameters* ZEDController::getPositionalTrackingParameters(
     c_trackingParams->initial_world_rotation = quat;
     c_trackingParams->set_as_static = trackingParams.set_as_static;
     c_trackingParams->set_floor_as_origin = trackingParams.set_floor_as_origin;
+    c_trackingParams->depth_min_range = trackingParams.depth_min_range;
     return c_trackingParams;
 }
 
@@ -289,7 +290,7 @@ void ZEDController::disableTracking(const char *path) {
 }
 
 sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin,
-        bool set_as_static, bool enable_imu_fusion, const char* area_file_path) {
+        bool set_as_static, bool enable_imu_fusion, float depth_min_range, const char* area_file_path) {
     if (!isNull()) {
         sl::PositionalTrackingParameters params;
         sl::Transform motion;
@@ -313,6 +314,7 @@ sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_
         params.set_floor_as_origin = set_floor_as_origin;
         params.set_as_static = set_as_static;
         params.enable_imu_fusion = enable_imu_fusion;
+        params.depth_min_range = depth_min_range;
 
         if (area_file_path != nullptr) {
             if (std::string(area_file_path) != "") {
@@ -631,6 +633,7 @@ SL_RecordingStatus* ZEDController::getRecordingStatus() {
 		c_recording_status->current_compression_time = recStatus.current_compression_time;
 		c_recording_status->is_paused = recStatus.is_paused;
 		c_recording_status->is_recording = recStatus.is_recording;
+		c_recording_status->status = recStatus.status;
 
 		return c_recording_status;
 	}
@@ -787,8 +790,8 @@ SL_PlaneData* ZEDController::findPlaneAtHit(SL_Vector2 pixels, bool thres) {
 sl::ERROR_CODE ZEDController::convertCurrentFloorPlaneToChunk(float* vertices, int* triangles, int* numVerticesTot, int* numTrianglesTot) {
     sl::Mesh mesh = currentFloorPlaneSDK.extractMesh();
     if (mesh.vertices.size() > 0 && mesh.triangles.size() > 0) {
-        memcpy(vertices, mesh.vertices.data(), sizeof (sl::float3) * int(mesh.vertices.size()));
-        memcpy(triangles, mesh.triangles.data(), sizeof (sl::uint3) * int(mesh.triangles.size()));
+        memcpy(&vertices[0], mesh.vertices.data(), sizeof (sl::float3) * int(mesh.vertices.size()));
+        memcpy(&triangles[0], mesh.triangles.data(), sizeof (sl::uint3) * int(mesh.triangles.size()));
         *numVerticesTot = 3 * mesh.vertices.size();
         *numTrianglesTot = 3 * int(mesh.triangles.size()); // mesh.triangles.size();
         return sl::ERROR_CODE::SUCCESS;
@@ -802,8 +805,8 @@ sl::ERROR_CODE ZEDController::convertCurrentFloorPlaneToChunk(float* vertices, i
 sl::ERROR_CODE ZEDController::convertCurrentHitPlaneToChunk(float* vertices, int* triangles, int* numVerticesTot, int* numTrianglesTot) {
     sl::Mesh mesh = currentPlaneAtHitSDK.extractMesh();
     if (mesh.vertices.size() > 0 && mesh.triangles.size() > 15 && currentPlaneAtHit.error_code == (int) sl::ERROR_CODE::SUCCESS) {
-        memcpy(vertices, mesh.vertices.data(), sizeof (sl::float3) * int(mesh.vertices.size()));
-        memcpy(triangles, mesh.triangles.data(), sizeof (sl::uint3) * int(mesh.triangles.size()));
+        memcpy(&vertices[0], mesh.vertices.data(), sizeof(sl::float3) * int(mesh.vertices.size()));
+        memcpy(&triangles[0], mesh.triangles.data(), sizeof(sl::uint3) * int(mesh.triangles.size()));
         *numVerticesTot = 3 * mesh.vertices.size();
         *numTrianglesTot = 3 * int(mesh.triangles.size());
         return sl::ERROR_CODE::SUCCESS;
@@ -1071,14 +1074,10 @@ void ZEDController::requestMeshAsync() {
 
 sl::ERROR_CODE ZEDController::updateMesh(int* numVertices, int* numTriangles, int* numUpdatedSubmeshes, int* updatedIndices, int* numVerticesTot, int* numTrianglesTot, const int maxSubmesh) {
     if (!isNull() && !isTextured) {
-        //LOG(verbosity, "ENTER --> updateMesh");
         if (zed.getSpatialMapRequestStatusAsync() == sl::ERROR_CODE::SUCCESS) {
-            //LOG(verbosity, "FUNC updateMesh : call getMeshRequestStatusAsync success");
             sl::ERROR_CODE v = zed.retrieveSpatialMapAsync(mesh);
             if (v != sl::ERROR_CODE::SUCCESS)
                 return v;
-
-            //LOG(verbosity, "FUNC updateMesh : call retrieveMeshAsync success : " + std::to_string(mesh.chunks.size()));
 
             *numUpdatedSubmeshes = 0;
             *numVerticesTot = 0;
@@ -1095,8 +1094,6 @@ sl::ERROR_CODE ZEDController::updateMesh(int* numVertices, int* numTriangles, in
                     (*numUpdatedSubmeshes)++;
                 }
             }
-
-            //LOG(verbosity, "FUNC updateMesh : fill vertices " + std::to_string(numUpdatedSubmeshes) + " " + std::to_string(numVerticesTot));
             isMeshUpdated = true;
             return v;
         }
@@ -1117,16 +1114,14 @@ sl::ERROR_CODE ZEDController::updateChunks(int* numVertices, int* numTriangles, 
             *numTrianglesTot = 0;
 
             for (int i = 0; i < std::min(maxSubmesh, int(mesh.chunks.size())); i++) {
-				//if (mesh.chunks[i].has_been_updated) 
-				{
-					numVertices[*numUpdatedSubmeshes] = mesh.chunks[i].vertices.size();
-					*numVerticesTot += mesh.chunks[i].vertices.size();
-					*numTrianglesTot += mesh.chunks[i].triangles.size();
-					numTriangles[*numUpdatedSubmeshes] = mesh.chunks[i].triangles.size();
+				numVertices[*numUpdatedSubmeshes] = mesh.chunks[i].vertices.size();
+				*numVerticesTot += mesh.chunks[i].vertices.size();
+				*numTrianglesTot += mesh.chunks[i].triangles.size();
+				numTriangles[*numUpdatedSubmeshes] = mesh.chunks[i].triangles.size();
 
-					updatedIndices[*numUpdatedSubmeshes] = i;
-					(*numUpdatedSubmeshes)++;
-				}
+				updatedIndices[*numUpdatedSubmeshes] = i;
+				(*numUpdatedSubmeshes)++;
+				
             }
 
             isMeshUpdated = true;
@@ -1137,18 +1132,25 @@ sl::ERROR_CODE ZEDController::updateChunks(int* numVertices, int* numTriangles, 
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
-sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertices, int* triangles) {
+sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertices, int* triangles, float* uvs, unsigned char* texturePtr) {
     if (!isNull() && !isTextured) {
         if (isMeshUpdated) {
-            int offsetVertices = 0, offsetTriangles = 0, offsetUvs = 0;
+            int offsetVertices = 0, offsetTriangles = 0, offsetUvs = 0, startIndexUV = 0;
+
+            bool isTextureCalled = areTextureReady && uvs != nullptr && texturePtr != nullptr;
+            if (isTextureCalled) {
+                texturePtr = mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU);
+            }
 
             for (int i = 0; i < std::min(maxSubmesh, int(mesh.chunks.size())); i++) {
-                //if (mesh.chunks[i].has_been_updated)
-                {
-                    memcpy(&vertices[offsetVertices], mesh.chunks[i].vertices.data(), sizeof (sl::float3) * int(mesh.chunks[i].vertices.size()));
-                    memcpy(&triangles[offsetTriangles], mesh.chunks[i].triangles.data(), sizeof (sl::uint3) * int(mesh.chunks[i].triangles.size()));
-                    offsetVertices += int(3 * mesh.chunks[i].vertices.size());
-                    offsetTriangles += int(3 * mesh.chunks[i].triangles.size());
+                memcpy(&vertices[offsetVertices], mesh.chunks[i].vertices.data(), sizeof (sl::float3) * int(mesh.chunks[i].vertices.size()));
+                memcpy(&triangles[offsetTriangles], mesh.chunks[i].triangles.data(), sizeof (sl::uint3) * int(mesh.chunks[i].triangles.size()));
+                offsetVertices += int(3 * mesh.chunks[i].vertices.size());
+                offsetTriangles += int(3 * mesh.chunks[i].triangles.size());
+                if (isTextureCalled) {
+                    memcpy(&uvs[offsetUvs], &mesh.uv.data()[startIndexUV], sizeof(sl::float2) * int(mesh.chunks[i].uv.size()));
+                    offsetUvs += int(2 * mesh.chunks[i].uv.size());
+                    startIndexUV += int(mesh.chunks[i].uv.size());
                 }
             }
 
@@ -1252,7 +1254,6 @@ bool ZEDController::filterMesh(sl::MeshFilterParameters::MESH_FILTER filterParam
 
 sl::ERROR_CODE ZEDController::updateFusedPointCloud(int* numPointsTot) {
     if (!isNull()) {
-        //LOG(verbosity, "ENTER updateFusedPointCloud");
         if (zed.getSpatialMapRequestStatusAsync() == sl::ERROR_CODE::SUCCESS) {
             sl::ERROR_CODE v = zed.retrieveSpatialMapAsync(pointCloudFused);
             if (v != sl::ERROR_CODE::SUCCESS)
@@ -1268,7 +1269,6 @@ sl::ERROR_CODE ZEDController::updateFusedPointCloud(int* numPointsTot) {
 
 sl::ERROR_CODE ZEDController::retrieveFusedPointCloud(float* vertices) {
     if (!isNull()) {
-        //LOG(verbosity, "ENTER retrieveFusedPointCloud");
         int numPointsTot = pointCloudFused.vertices.size();
         if (numPointsTot > 0) {
             memcpy(&vertices[0], pointCloudFused.vertices.data(), sizeof (sl::float4) * numPointsTot);
@@ -1410,7 +1410,113 @@ bool ZEDController::applyTexture(int* numVertices, int* numTriangles, int* numUp
     }
 
     return false;
+}
 
+sl::ERROR_CODE ZEDController::updateWholeMesh(int* nb_vertices, int* nb_triangles) {
+    if (!isNull() && !isTextured) {
+        if (zed.getSpatialMapRequestStatusAsync() == sl::ERROR_CODE::SUCCESS) {
+            sl::ERROR_CODE v = zed.retrieveSpatialMapAsync(mesh);
+            if (v != sl::ERROR_CODE::SUCCESS)
+                return v;
+
+            *nb_vertices = mesh.vertices.size();
+            *nb_triangles = mesh.triangles.size();
+
+            isMeshUpdated = true;
+            return v;
+        }
+        return sl::ERROR_CODE::FAILURE;
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+
+}
+
+sl::ERROR_CODE ZEDController::retrieveWholeMesh(float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr) {
+    if (!isNull() && !isTextured) {
+        if (isMeshUpdated) {
+
+            bool isTextureCalled = areTextureReady && uvs != nullptr && texture_ptr != nullptr;
+            if (isTextureCalled) {
+                texture_ptr = mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU);
+            }
+
+            memcpy(&vertices[0] , mesh.vertices.data()  , sizeof(sl::float3) * int(mesh.vertices.size()));
+            memcpy(&uvs[0], mesh.uv.data(), sizeof(sl::float2) * int(mesh.uv.size()));
+            memcpy(&triangles[0], mesh.triangles.data() , sizeof(sl::uint3)  * int(mesh.triangles.size()));
+
+            if (areTextureReady && uvs != nullptr && texture_ptr != nullptr) {
+                isTextured = true;
+            }
+            return sl::ERROR_CODE::SUCCESS;
+        }
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
+bool ZEDController::loadWholeMesh(const char* filename, int* nb_vertices, int* nb_triangles, int* texture_size) {
+    if (mesh.load(filename, false)) {
+
+        *nb_vertices = 0;
+        *nb_triangles = 0;
+
+        if (mesh.texture.isInit() && texture_size != nullptr) {
+            texture_size[1] = mesh.texture.getHeight();
+            texture_size[0] = mesh.texture.getWidth();
+        }
+
+        *nb_vertices = mesh.vertices.size();
+        *nb_triangles = mesh.triangles.size();
+
+        isMeshUpdated = true;
+
+        if (mesh.texture.isInit() && texture_size != nullptr) {
+            areTextureReady = true;
+        }
+        else {
+            texture_size[0] = -1;
+        }
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+bool ZEDController::applyWholeTexture(int* nb_vertices, int* nb_triangles, int* texture_size) {
+    if (mesh.applyTexture(sl::MESH_TEXTURE_FORMAT::RGBA)) {
+
+        *nb_vertices = 0;
+        *nb_triangles = 0;
+
+        *nb_vertices = mesh.vertices.size();
+        *nb_triangles = mesh.triangles.size();
+
+        texture_size[0] = mesh.texture.getWidth();
+        texture_size[1] = mesh.texture.getHeight();
+        isMeshUpdated = true;
+        areTextureReady = true;
+        return true;
+    }
+
+    return false;
+}
+
+bool ZEDController::filterWholeMesh(sl::MeshFilterParameters::MESH_FILTER filter_param, int* nb_vertices, int* nb_triangles) {
+    if (!isNull() && !isTextured) {
+        if (mesh.filter(sl::MeshFilterParameters(filter_param), false)) {
+
+            *nb_vertices = 0;
+            *nb_triangles = 0;
+
+            *nb_vertices = mesh.vertices.size();
+            *nb_triangles = mesh.triangles.size();
+
+            isMeshUpdated = true;
+            return true;
+        }
+        return false;
+    }
+    return false;
 }
 
 sl::ERROR_CODE ZEDController::enableStreaming(sl::STREAMING_CODEC codec, unsigned int bitrate, unsigned short port, int gopSize, bool adaptativeBitrate, int chunk_size, int target_framerate) {
@@ -1610,6 +1716,7 @@ sl::ERROR_CODE ZEDController::retrieveObjectDetectionData(SL_ObjectDetectionRunt
         cuCtxSetCurrent(zed.getCUDAContext());
         sl::ObjectDetectionRuntimeParameters runtime_params;
         runtime_params.detection_confidence_threshold = _objruntimeparams->detection_confidence_threshold;
+        runtime_params.minimum_keypoints_threshold = _objruntimeparams->minimum_keypoints_threshold;
 
         runtime_params.object_class_filter = std::vector<sl::OBJECT_CLASS>{};
         runtime_params.object_class_detection_confidence_threshold = std::map<sl::OBJECT_CLASS, float>{};
@@ -1626,7 +1733,6 @@ sl::ERROR_CODE ZEDController::retrieveObjectDetectionData(SL_ObjectDetectionRunt
         sl::ERROR_CODE v = zed.retrieveObjects(objects, runtime_params);
 
         if (v == sl::ERROR_CODE::SUCCESS) {
-            //LOG(verbosity, "retrieve objects :" + std::to_string(objects.object_list.size()));
             data->is_new = objects.is_new;
             data->is_tracked = objects.is_tracked;
             data->detection_model = (SL_DETECTION_MODEL) current_detection_model;
@@ -1668,6 +1774,11 @@ sl::ERROR_CODE ZEDController::retrieveObjectDetectionData(SL_ObjectDetectionRunt
                     data->object_list[count].velocity.x = p.velocity.x;
                     data->object_list[count].velocity.y = p.velocity.y;
                     data->object_list[count].velocity.z = p.velocity.z;
+
+                    data->object_list[count].dimensions.x = p.dimensions.x;
+                    data->object_list[count].dimensions.y = p.dimensions.y;
+                    data->object_list[count].dimensions.z = p.dimensions.z;
+                    
 
                     // 3D Bounding box in world frame
                     for (int m = 0; m < 8; m++) {
