@@ -394,8 +394,6 @@ enum SL_VIDEO_SETTINGS {
 	SL_VIDEO_SETTINGS_LAST
 };
 
-const int SL_VIDEO_SETTINGS_VALUE_AUTO = -1;
-
 /**
 \brief Lists retrievable measures.
 */
@@ -418,7 +416,7 @@ enum SL_MEASURE {
 	SL_MEASURE_XYZABGR_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the ABGR color. SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_NORMALS_RIGHT, /** Normals vector for right view. Each pixel contains 4 float (X, Y, Z, 0).  SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_DEPTH_U16_MM, /** Depth map in millimeter whatever the SL_UNIT defined in SL_InitParameters. Invalid values are set to 0, depth values are clamped at 65000.  Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
-	SL_MEASURE_DEPTH_U16_MM_RIGHT /** Depth map in millimeter for right sensor. Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
+	SL_MEASURE_DEPTH_U16_MM_RIGHT, /** Depth map in millimeter for right sensor. Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
 };
 
 /**
@@ -438,7 +436,7 @@ enum SL_VIEW {
 	SL_VIEW_CONFIDENCE, /** Color rendering of the depth confidence. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
 	SL_VIEW_NORMALS, /** Color rendering of the normals. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
 	SL_VIEW_DEPTH_RIGHT, /** Color rendering of the right depth mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_NORMALS_RIGHT /** Color rendering of the normals mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_NORMALS_RIGHT, /** Color rendering of the normals mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
 };
 
 /**
@@ -635,7 +633,7 @@ enum SL_DETECTION_MODEL {
 	SL_DETECTION_MODEL_MULTI_CLASS_BOX_MEDIUM, /**< Any objects, bounding box based, compromise between accuracy and speed */
 	SL_DETECTION_MODEL_HUMAN_BODY_MEDIUM, /**<  Keypoints based, specific to human skeleton, compromise between accuracy and speed */
 	SL_DETECTION_MODEL_PERSON_HEAD_BOX, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environement, the person localization is also improved */
-	SL_DETECTION_MODEL_PERSON_HEAD_BOX_ACCURATE, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environments, the person localization is also improved, state of the art accuracy */
+	SL_DETECTION_MODEL_PERSON_HEAD_BOX_ACCURATE, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environement, the person localization is also improved */
 	SL_DETECTION_MODEL_CUSTOM_BOX_OBJECTS /**< For external inference, using your own custom model and/or frameworks. This mode disable the internal inference engine, the 2D bounding box detection must be provided */
 };
 
@@ -789,7 +787,6 @@ struct SL_InitParameters
 	This parameter allows you to select to desired input.
 	*/
 	enum  SL_INPUT_TYPE input_type;
-
 	/**
 	Define the chosen camera resolution. Small resolutions offer higher framerate and lower computation time (SL_RESOLUTION).\n
 	In most situations, the \ref RESOLUTION "RESOLUTION_HD720" at 60 fps is the best balance between image quality and framerate.\n
@@ -797,7 +794,6 @@ struct SL_InitParameters
 	\n default : \ref RESOLUTION "RESOLUTION_HD720"
 	 */
 	enum  SL_RESOLUTION resolution;
-
 	/**
 	Requested camera frame rate. If set to 0, the highest FPS of the specified \ref camera_resolution will be used.\n
 	See \ref RESOLUTION for a list of supported framerates.
@@ -805,29 +801,26 @@ struct SL_InitParameters
 	\note If the requested camera_fps is unsupported, the closest available FPS will be used.
 	 */
 	int camera_fps;
-
 	/**
 	Id of the Camera.
 	*/
 	int camera_device_id;
-
 	/**
 	If you are using the camera upside down, setting this parameter to FLIP_MODE_ON will cancel its rotation. The images will be horizontally flipped.
 	\n default : FLIP_MODE_AUTO
-	* From ZED SDK 3.2 a new FLIP_MODE enum was introduced to add the automatic flip mode detection based on the IMU gravity detection. This only works for ZED-M or ZED2 cameras.
-	*/
+	 * From ZED SDK 3.2 a new FLIP_MODE enum was introduced to add the automatic flip mode detection based on the IMU gravity detection. This only works for ZED-M or ZED2 cameras.
+	 */
 	enum  SL_FLIP_MODE camera_image_flip;
-
 	/**
 	At initialization, the \ref Camera runs a self-calibration process that corrects small offsets from the device's factory calibration.\n
-	A drawback is that calibration parameters will slightly change from one (live) run to another, which can be an issue for repeatability.\n
-	If set to true, self-calibration will be disabled and calibration parameters won't be optimized, raw calibration parameters from the conf file will be used\n
+	A drawback is that calibration parameters will slightly change from one run to another, which can be an issue for repeatability.\n
+	If set to true, self-calibration will be disabled and calibration parameters won't be optimized.\n
 	default : false
 	\note In most situations, self calibration should remain enabled.
 	\note You can also trigger the self-calibration at anytime after open() by calling \ref Camera::UpdateSelfCalibration(), even if this parameter is set to true.
+
 	 */
 	bool camera_disable_self_calib;
-
 	/**
 	By default, the SDK only computes a single depth map, aligned with the left camera image.\n
 	This parameter allows you to enable the \ref MEASURE "MEASURE_DEPTH_RIGHT" and other \ref MEASURE "MEASURE_<XXX>_RIGHT" at the cost of additional computation time.\n
@@ -853,9 +846,9 @@ struct SL_InitParameters
 	enum SL_DEPTH_MODE depth_mode;
 	/**
 	Regions of the generated depth map can oscillate from one frame to another. These oscillations result from a lack of texture (too homogeneous) on an object and by image noise.
-	\n This parameter control a stabilization filter that reduces these oscillations. In the range [0-100], 0 is disable (raw depth), smoothness is linear from 1 to 100.
-	\n default : 1
-	\note The stabilization uses the positional tracking to increase its accuracy, so the Positional Tracking module will be enabled automatically when set to a value different from 0.\n
+	\n This parameter enables a stabilization filter that reduces these oscillations.
+	\n default : true
+	\note The stabilization uses the positional tracking to increase its accuracy, so the Positional Tracking module will be enabled automatically when set to true.\n
 	 */
 	int depth_stabilization;
 	/**
@@ -969,6 +962,7 @@ struct SL_RuntimeParameters
 	\n Decreasing this value will remove depth data from image areas which are uniform.
 	 */
 	int texture_confidence_threshold;
+
     /**
      Defines if the saturated area (Luminance>=255) must be removed from depth map estimation
      \n True by default
@@ -1187,6 +1181,7 @@ struct SL_PositionalTrackingParameters
 	 * default : -1 which means no minimum depth
 	 */
 	float depth_min_range;
+
 };
 
 /**
@@ -1350,169 +1345,6 @@ struct SL_StreamingProperties {
 	 */
 	enum SL_STREAMING_CODEC codec;
 };
-
-/**
-\brief Recording structure that contains information about SVO.
- */
-struct SL_RecordingStatus {
-	/**< Recorder status, true if enabled */
-	bool is_recording; 
-	/**< Recorder status, true if the pause is enabled */
-	bool is_paused; 
-	/**< Status of current frame. True for success or false if the frame couldn't be written in the SVO file.*/
-	bool status; 
-	/**< Compression time for the current frame in ms.*/
-	double current_compression_time; 
-	/**< Compression ratio (% of raw size) for the current frame.*/
-	double current_compression_ratio; 
-	/**< Average compression time in ms since beginning of recording.*/
-	double average_compression_time;
-	/**< Average compression ratio (% of raw size) since beginning of recording.*/
-	double average_compression_ratio; 
-};
-
-/**
-\brief Sets the recording parameters.
- */
-struct SL_RecordingParameters {
-	/**
-	\brief filename of the SVO file.
-	 */
-	unsigned char video_filename[256];
-
-	/**
-	\brief can be one of the \ref SL_SVO_COMPRESSION_MODE enum
-	 */
-	enum SL_SVO_COMPRESSION_MODE compression_mode;
-
-	/**
-	 \brief overrides default bitrate of the SVO file, in KBits/s. Only works if \ref SVO_COMPRESSION_MODE is H264 or H265.
-	 \n default : 0 means default values (depends on the resolution)
-	 \note Available range : 0 or [1000 - 60000]
-	 */
-	unsigned int bitrate;
-
-	/**
-	 \brief defines the target framerate for the recording module.
-	 \warning This framerate must be below or equal to the camera framerate and camera framerate must be a multiple of the target framerate. It means that
-	 it must respect camera_framerate%target_framerate==0
-	 Allowed framerates are 15,30, 60 or 100 if possible.
-	 Any other values will be discarded and camera FPS will be taken.
-	 \n default : 0, meaning that the camera framerate will be taken
-	 */
-	unsigned int target_framerate;
-
-	/**
-	\brief In case of streaming input, if set to false, it will avoid decoding/re-encoding and convert directly streaming input into a SVO file.
-	This saves a encoding session and can be especially useful on NVIDIA Geforce cards where the number of encoding session is limited.
-	\note compression_mode, target_framerate and bitrate will be ignored in this mode.
-	 */
-	bool transcode_streaming_input;
-};
-
-/**
-\brief Sets the streaming parameters.
-\note Parameters can be user adjusted.
- */
-struct SL_StreamingParameters {
-
-	/**
-	\brief Defines the codec used for streaming.
-	\warning If HEVC is used, make sure the receiving host is compatible with H265 decoding (Pascal NVIDIA card or newer). If not, prefer to use H264 since every compatible NVIDIA card supports H264 decoding
-		*/
-	enum SL_STREAMING_CODEC codec;
-
-	/**
-	\brief Defines the port used for streaming.
-	\warning Port must be an even number. Any odd number will be rejected.
-	\warning Port must be opened.
-	 */
-	unsigned short port;
-
-	/**
-	\brief Defines the streaming bitrate in Kbits/s
-	 *
-	 *
-	 *  | STREAMING_CODEC  | Resolution   | FPS   | bitrate (kbps) |
-	 *  |------------------|--------------|-------|----------------|
-	 *  | H264             |  HD2K        |   15  |     8500       |
-	 *  | H264             |  HD1080      |   30  |    12500       |
-	 *  | H264             |  HD720       |   60  |     7000       |
-	 *  | H265             |  HD2K        |   15  |     7000       |
-	 *  | H265             |  HD1080      |   30  |    11000       |
-	 *  | H265             |  HD720       |   60  |     6000       |
-
-	\note Available range : [1000 - 60000]
-	 */
-	unsigned int bitrate;
-
-	/**
-	\brief Defines the gop size in number of frames.
-	\note if value is set to -1, the gop size will last at maximum 2 seconds, depending on camera fps.
-	\note The gop size determines the maximum distance between IDR/I-frames. Very high GOP size will result in slightly more efficient compression, especially on static scenes. But latency will increase.
-	\note maximum value: 256
-	 */
-	int gop_size;
-
-	/**
-	\brief Enable/Disable adaptive bitrate
-	\note Bitrate will be adjusted depending the number of packet dropped during streaming.
-	\note if activated, bitrate can vary between [bitrate/4, bitrate]
-	\warning Currently, the adaptive bitrate only works when "sending" device is a NVIDIA Jetson (X1,X2,Xavier,Nano)
-	 */
-	bool adaptative_bitrate;
-
-	/**
-	\brief Defines a single chunk size
-	\note Stream buffers are divided in X number of chunk where each chunk is "chunk_size" bytes long.
-	\note Default value is 16084. You can lower this value if network generates a lot of packet lost : this will
-	generates more chunk for a single image, but each chunk sent will be lighter to avoid inside-chunk corruption.
-	Increasing this value can decrease latency.
-	\note Available range : [4096 - 65000]
-	 */
-	unsigned short chunk_size;
-
-
-	/**
-	 \brief defines the target framerate for the streaming output.
-	 \warning This framerate must be below or equal to the camera framerate. Allowed framerates are 15,30, 60 or 100 if possible.
-	 Any other values will be discarded and camera FPS will be taken.
-	 \ndefault : 0, meaning that the camera framerate will be taken
-	 */
-	unsigned int target_framerate;
-};
-
-/**
-\struct StreamingProperties
-\brief Properties of a streaming device
-  */
-struct SL_StreamingProperties {
-	/**
-	the streaming IP of the device
-	 */
-	unsigned char ip[16];
-
-	/**
-	the streaming port
-	 */
-	unsigned short port;
-
-	/**
-	the serial number of the streaming device
-	 */
-	unsigned int serial_number;
-
-	/**
-	the current bitrate of encoding of the streaming device
-	 */
-	int current_bitrate;
-
-	/**
-	the current codec used for compression in streaming device
-	 */
-	enum SL_STREAMING_CODEC codec;
-};
-
 
 struct SL_SpatialMappingParameters {
 	/**
@@ -1682,12 +1514,6 @@ struct SL_ObjectDetectionRuntimeParameters
 	 * ObjectDetectionRuntimeParameters::detection_confidence_threshold will be taken as fallback/default value
 	 */
 	int object_confidence_threshold[(int)SL_OBJECT_CLASS_LAST];
-	/**
-	\brief Defines the minimum keypoints threshold.
-	 * the SDK will outputs skeletons with more keypoints than this threshold
-	 * it is useful for example to remove unstable fitting results when a skeleton is partially occluded
-	 */
-	int minimum_keypoints_threshold;
 };
 
 /**
@@ -1757,6 +1583,7 @@ struct SL_ObjectData
 	 * \brief 3D object dimensions: width, height, length. Defined in SL_InitParameters_UNIT, expressed in SL_RuntimeParameters::measure3D_reference_frame.
 	 */
 	struct SL_Vector3 dimensions;
+
 	/**
 	 * \brief 3D bounding box of the person represented as eight 3D points
 	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
@@ -2014,6 +1841,15 @@ struct SL_ObjectDetectionFusionParameters
 	 *
 	 */
 	enum SL_BODY_FORMAT body_format;
+};
+
+struct SL_ObjectDetectionFusionRuntimeParameters
+{
+	/**
+	* @brief if the fused skeleton has less than skeleton_minimum_allowed_keypoints keypoints, it will be discarded. Default is -1.
+	 *
+	 */
+	int skeleton_minimum_allowed_keypoints;
 };
 
 struct SL_CameraIdentifier {

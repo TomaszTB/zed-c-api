@@ -3,7 +3,7 @@
 
 
 #include <sl/Camera.hpp>
-#include <sl_mc/MultiCamera.hpp>
+#include <sl/MultiCamera.hpp>
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -52,7 +52,7 @@ public:
 
 	int grabAll(struct SL_RuntimeMultiCameraParameters* rt_params);
 
-	sl::ERROR_CODE retrieveFusedObjectDetectionData(struct SL_Objects* data);
+	sl::ERROR_CODE retrieveFusedObjectDetectionData(struct SL_Objects* data, struct SL_ObjectDetectionFusionRuntimeParameters rt);
 
 	sl::ERROR_CODE removeCamera(struct SL_CameraIdentifier* uuid);
 	void destroy();

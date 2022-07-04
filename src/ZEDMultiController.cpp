@@ -191,11 +191,14 @@ sl::ERROR_CODE ZEDMultiController::removeCamera(SL_CameraIdentifier* uuid)
 	return multi_camera.removeCamera(uuid_);
 }
  
-sl::ERROR_CODE ZEDMultiController::retrieveFusedObjectDetectionData(SL_Objects* data) {
+sl::ERROR_CODE ZEDMultiController::retrieveFusedObjectDetectionData(SL_Objects* data, struct SL_ObjectDetectionFusionRuntimeParameters rt) {
 	memset(data, 0, sizeof(SL_Objects));
- 
+
+	sl::ObjectDetectionFusionRuntimeParameters od_rt;
+	od_rt.skeleton_minimum_allowed_keypoints = rt.skeleton_minimum_allowed_keypoints;
+
 	sl::Objects objects;
-	sl::ERROR_CODE v = multi_camera.retrieveFusedObjects(objects);
+	sl::ERROR_CODE v = multi_camera.retrieveFusedObjects(objects, od_rt);
 	if (v == sl::ERROR_CODE::SUCCESS) {
 		//LOG(verbosity, "retrieve objects :" + std::to_string(objects.object_list.size()));
 		data->is_new = objects.is_new;
@@ -207,7 +210,7 @@ sl::ERROR_CODE ZEDMultiController::retrieveFusedObjectDetectionData(SL_Objects* 
 
 		int count = 0;
 
-		for (auto &p : objects.object_list) {
+		for (auto& p : objects.object_list) {
 			if (count < MAX_NUMBER_OBJECT) {
 				//data->data_object[count].valid = true;
 				data->object_list[count].label = (SL_OBJECT_CLASS)p.label;
@@ -295,6 +298,5 @@ sl::ERROR_CODE ZEDMultiController::retrieveFusedObjectDetectionData(SL_Objects* 
 		}
 	}
 	return v;
- 
-}
 
+}
