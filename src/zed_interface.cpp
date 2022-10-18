@@ -64,7 +64,6 @@
 #include <numeric>      // std::accumulate
 
 
-
 namespace utils {
 
     inline int _getHex(std::string hexstr) {
@@ -309,6 +308,14 @@ extern "C" {
 	INTERFACE_API bool sl_is_opened(int c_id) {
 		return  ZEDController::get(c_id)->zed.isOpened();
 	}
+
+    INTERFACE_API int sl_set_region_of_interest(int c_id, void* ptr) {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return (int)ZEDController::get(c_id)->zed.setRegionOfInterest(*MAT);
+        }
+        else
+            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+    }
 
 	INTERFACE_API CUcontext sl_get_cuda_context(int c_id)
 	{
@@ -708,7 +715,7 @@ extern "C" {
     INTERFACE_API int sl_enable_positional_tracking(int c_id, SL_PositionalTrackingParameters * tracking_param, const char * area_path) {
         if (!ZEDController::get(c_id)->isNull()) {
             return (int) ZEDController::get(c_id)->enableTracking(&tracking_param->initial_world_rotation, &tracking_param->initial_world_position, tracking_param->enable_area_memory, tracking_param->enable_pose_smothing, tracking_param->set_floor_as_origin,
-                    tracking_param->set_as_static, tracking_param->enable_imu_fusion, tracking_param->depth_min_range, area_path);
+                    tracking_param->set_as_static, tracking_param->enable_imu_fusion, tracking_param->depth_min_range, tracking_param->set_gravity_as_origin, area_path);
         } else
             return (int) sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
@@ -1177,6 +1184,10 @@ extern "C" {
             return (int) ZEDController::get(c_id)->zed.retrieveImage(*MAT, (sl::VIEW)type, (sl::MEM)(mem + 1), sl::Resolution(width, height));
         }
         return (int) sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+    }
+
+    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, cudaStream_t stream) {
+        return (int)sl::convertImage(*(sl::Mat*)image_in_ptr, *(sl::Mat*)image_signed_ptr, (cudaStream_t)stream);
     }
 
     INTERFACE_API void* sl_mat_create_new(int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem) {

@@ -4,6 +4,8 @@
 #include "types_c.h"
 #include <stdbool.h>
 #include <cuda.h>
+#include <cuda_runtime.h>
+
 /**
  * @file
  * */
@@ -26,6 +28,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 
     /**
     \brief Forces unload of all instances.
@@ -105,6 +108,14 @@ extern "C" {
     \param camera_id of the camera instance.
      */
     INTERFACE_API void sl_close_camera(int camera_id);
+
+    /**
+    \brief Defines a region of interest to focus on for all the SDK, discarding other parts.
+    \param camera_id of the camera instance.
+    \param roi_mask: the Mat defining the requested region of interest, all pixel set to 0 will be discard. If empty, set all pixels as valid, otherwise should fit the resolution of the current instance and its type should be U8_C1.
+    \return An ERROR_CODE if something went wrong.
+     */
+    INTERFACE_API int sl_set_region_of_interest(int camera_id, void* roi_mask);
     /**
     \brief Grabs the lastest images from the camera.
     \param camera_id : id of the camera instance.
@@ -888,6 +899,14 @@ extern "C" {
      */
     INTERFACE_API int sl_retrieve_image(int camera_id, void* image_ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height);
 
+    /**
+    \brief Convert Image format from Unsigned char to Signed char, designed for Unreal Engine pipeline, works on GPU memory.
+    \param image_in : input image to convert
+    \param image_signed : output image to converted
+    \param stream : a cuda stream to put the compute to (def. 0)
+    \note If the Output Mat does not satisfies the requirements, it is freed and re-allocated.
+    */
+    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, cudaStream_t stream);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////// Streaming Sender //////////////////////////////////////////////////////////////////////

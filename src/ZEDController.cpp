@@ -94,7 +94,7 @@ int ZEDController::initFromSVO(SL_InitParameters *params, const char* path_svo, 
     sprintf(buffer_verbose, "ENTER ZEDController::initFromSVO %d = %d", params->camera_device_id, camera_ID);
 
 
-    if (sl::String(path_svo) == NULL) {
+    if (sl::String(path_svo).empty()) {
         sprintf(buffer_verbose, "Invalid SVO Path");
         return (int) sl::ERROR_CODE::INVALID_SVO_FILE;
     }
@@ -128,7 +128,7 @@ int ZEDController::initFromStream(SL_InitParameters *params, const char* ip, int
         return 0;
     }
 
-    if (sl::String(ip) == NULL) {
+    if (sl::String(ip).empty()) {
         sprintf(buffer_verbose, "Invalid IP address");
         return (int) sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
@@ -260,6 +260,7 @@ SL_PositionalTrackingParameters* ZEDController::getPositionalTrackingParameters(
     c_trackingParams->set_as_static = trackingParams.set_as_static;
     c_trackingParams->set_floor_as_origin = trackingParams.set_floor_as_origin;
     c_trackingParams->depth_min_range = trackingParams.depth_min_range;
+    c_trackingParams->set_gravity_as_origin = trackingParams.set_gravity_as_origin;
     return c_trackingParams;
 }
 
@@ -290,7 +291,7 @@ void ZEDController::disableTracking(const char *path) {
 }
 
 sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin,
-        bool set_as_static, bool enable_imu_fusion, float depth_min_range, const char* area_file_path) {
+        bool set_as_static, bool enable_imu_fusion, float depth_min_range, bool set_gravity_as_origin, const char* area_file_path) {
     if (!isNull()) {
         sl::PositionalTrackingParameters params;
         sl::Transform motion;
@@ -315,6 +316,7 @@ sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_
         params.set_as_static = set_as_static;
         params.enable_imu_fusion = enable_imu_fusion;
         params.depth_min_range = depth_min_range;
+        params.set_gravity_as_origin = set_gravity_as_origin;
 
         if (area_file_path != nullptr) {
             if (std::string(area_file_path) != "") {
@@ -1437,7 +1439,8 @@ sl::ERROR_CODE ZEDController::retrieveWholeMesh(float* vertices, int* triangles,
 
             bool isTextureCalled = areTextureReady && uvs != nullptr && texture_ptr != nullptr;
             if (isTextureCalled) {
-                texture_ptr = mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU);
+                //texture_ptr = mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU);
+                memcpy(&texture_ptr[0], mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU), mesh.texture.getStepBytes() * mesh.texture.getHeight());
             }
 
             memcpy(&vertices[0] , mesh.vertices.data()  , sizeof(sl::float3) * int(mesh.vertices.size()));
@@ -1616,6 +1619,7 @@ sl::ERROR_CODE ZEDController::enableObjectDetection(SL_ObjectDetectionParameters
 		params.body_format = (sl::BODY_FORMAT)obj_params->body_format;
         params.detection_model = (sl::DETECTION_MODEL)obj_params->model;
 		params.filtering_mode = (sl::OBJECT_FILTERING_MODE)obj_params->filtering_mode;
+        params.prediction_timeout_s = obj_params->prediction_timeout_s;
         if (obj_params->max_range > 0)
             params.max_range = obj_params->max_range;
 
@@ -1659,6 +1663,7 @@ SL_ObjectDetectionParameters* ZEDController::getObjectDetectionParameters() {
 	c_odParams->image_sync = odParams.image_sync;
 	c_odParams->max_range = odParams.max_range;
 	c_odParams->model = (SL_DETECTION_MODEL)odParams.detection_model;
+    c_odParams->prediction_timeout_s = odParams.prediction_timeout_s;
 
 	return c_odParams;
 }
