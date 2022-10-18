@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.4)
 
-set(PROJECT_NAME zed-c-api)
 set(PROJECT_NAME_INTERFACEC sl_zed_c)
 
 project (${PROJECT_NAME} C CXX)
@@ -26,12 +25,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 link_directories(${ZED_LIBRARY_DIR})
 link_directories(${CUDA_LIBRARY_DIRS})
-
-if (WIN32)
-	STRING(REGEX REPLACE "cudart.lib" ""  CUDA_CUDART_LIBRARY_STATIC ${CUDA_CUDART_LIBRARY})
-	SET(CUDA_CUDART_LIBRARY_STATIC "${CUDA_CUDART_LIBRARY_STATIC}cudart_static.lib")
-	message("cudart static :  ${CUDA_CUDART_LIBRARY_STATIC}")
-endif(WIN32)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11")
@@ -73,27 +66,13 @@ else(MSVC)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_DEBUG")
 	endif()
 
-	##Unix
-	#detect cuvid lib
-	exec_program(find ARGS "/usr/lib/ -type f -name libnvcuvid*" OUTPUT_VARIABLE CUVID_LIBRARY)
-
-	#message(${CUVID_LIBRARY})
-	#message(${CUDA_CUDA_LIBRARY})
-	#message(${CUDA_LIBRARIES_ZED_STATIC})
 
 	target_link_libraries(${PROJECT_NAME_INTERFACEC}
 						${ZED_LIBRARIES}
-						#${CUDA_CUDART_LIBRARY_STATIC}
 						${CUDA_CUDA_LIBRARY}
-						#${CUDA_LIBRARIES_ZED_STATIC}
-						#"${LIB_PATH_64}libpng.so"
-						#"${LIB_PATH_64}libturbojpeg.so.0"
-						#z pthread dl gomp rt usb jpeg usb-1.0
-						#cuda
 						gomp
 						pthread
 						usb
-						${CUVID_LIBRARY}
 					)
 
 	##install

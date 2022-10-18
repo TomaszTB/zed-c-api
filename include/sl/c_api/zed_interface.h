@@ -3,6 +3,9 @@
 
 #include "types_c.h"
 #include <stdbool.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 /**
  * @file
  * */
@@ -25,6 +28,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 
     /**
     \brief Forces unload of all instances.
@@ -72,6 +76,12 @@ extern "C" {
     \return An error code giving information about the internal process. If SUCCESS (0) is returned, the camera is ready to use. Every other code indicates an error and the program should be stopped.
     */
     INTERFACE_API int sl_open_camera(int camera_id, struct SL_InitParameters *init_parameters, const char* path_svo, const char* ip, int stream_port, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
+	
+	/**
+	\brief Gets the Camera-created CUDA context for sharing it with other CUDA-capable libraries.
+	\param camera_id : id of the camera instance.
+	*/
+	INTERFACE_API CUcontext sl_get_cuda_context(int camera_id);
 
     /**
     \brief Returns the initparameters used to open the ZED camera
@@ -98,6 +108,14 @@ extern "C" {
     \param camera_id of the camera instance.
      */
     INTERFACE_API void sl_close_camera(int camera_id);
+
+    /**
+    \brief Defines a region of interest to focus on for all the SDK, discarding other parts.
+    \param camera_id of the camera instance.
+    \param roi_mask: the Mat defining the requested region of interest, all pixel set to 0 will be discard. If empty, set all pixels as valid, otherwise should fit the resolution of the current instance and its type should be U8_C1.
+    \return An ERROR_CODE if something went wrong.
+     */
+    INTERFACE_API int sl_set_region_of_interest(int camera_id, void* roi_mask);
     /**
     \brief Grabs the lastest images from the camera.
     \param camera_id : id of the camera instance.
@@ -627,9 +645,9 @@ extern "C" {
     \param max_sub_mesh : Maximum number of submeshes.
     \return SUCCESS if the mesh is updated.
      */
-    INTERFACE_API int sl_update_mesh(int camera_id, int* nb_vertices, int* nb_triangles, int* nb_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, const int max_submesh);
+    INTERFACE_API int sl_update_mesh(int camera_id, int* nb_vertices_per_submesh, int* nb_triangles_per_submesh, int* nb_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, const int max_submesh);
     /**
-    \brief Retrieves all chunks of the generated mesh. Call update_mesh before calling this.
+    \brief Retrieves all chunks of the current mesh. Call update_mesh before calling this.
     Vertex and triangles arrays must be at least of the sizes returned by update_mesh (nb_vertices and nb_triangles).
     \param camera_id : id of the camera instance.
     \param vertices : Vertices of the mesh
@@ -652,17 +670,20 @@ extern "C" {
     \param max_sub_mesh : Maximum number of submeshes.
     \return SUCCESS if the chunks are updated.
      */
-    INTERFACE_API int sl_update_chunks(int camera_id, int* nb_vertices, int* nb_triangles, int* nb_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, const int max_submesh);
+    INTERFACE_API int sl_update_chunks(int camera_id, int* nb_vertices_per_submesh, int* nb_triangles_per_submesh, int* nb_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, const int max_submesh);
     /**
-    \brief Retrieves one chunk data. Call update_chunks before calling this.
+    \brief Retrieves all chunks of the full mesh. Call update_mesh before calling this.
     Vertex and triangles arrays must be at least of the sizes returned by update_mesh (nbVertices and nbTriangles).
     \param camera_id : id of the camera instance.
     \param max_submesh : Maximum number of submesh that can be handled.
     \param vertices : Vertices of the chunk
     \param triangles : Triangles of the chunk.
+    \param uvs : uvs of the texture.
+    \param texture_ptr : Texture of the mesh (if enabled).
     \return SUCCESS if the chunk is retrieved.
      */
-    INTERFACE_API int sl_retrieve_chunks(int camera_id, float* vertices, int* triangles, const int max_submesh);
+    INTERFACE_API int sl_retrieve_chunks(int camera_id, float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr, const int max_submesh);
+
     /**
     \brief Updates the fused point cloud (if spatial map type was FUSED_POINT_CLOUD).
     \param camera_id : id of the camera instance.
@@ -713,7 +734,7 @@ extern "C" {
     \param texture_size : Array containing the sizes of all the textures (width ,height) if applicable.
     \return True if the file was successfully loaded, false otherwise.
      */
-    INTERFACE_API bool sl_load_mesh(int camera_id, const char* filename, int* nb_vertices, int* nb_triangles, int* num_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, int* textures_size,const int max_submesh);
+    INTERFACE_API bool sl_load_mesh(int camera_id, const char* filename, int* nb_vertices_per_submesh, int* nb_triangles_per_submesh, int* num_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, int* textures_size,const int max_submesh);
     /**
     \brief Applies the scanned texture onto the internal scanned mesh.
     \param camera_id : id of the camera instance.
@@ -727,12 +748,12 @@ extern "C" {
     \param texture_size : Array containing the sizes of all the textures (width ,height) if applicable.
     \return True if the texturing was successful, false otherwise.
      */
-    INTERFACE_API bool sl_apply_texture(int camera_id, int* nb_vertices, int* nb_triangles, int* nb_updated_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, int* textures_size, const int max_submesh);
+    INTERFACE_API bool sl_apply_texture(int camera_id, int* nb_vertices_per_submesh, int* nb_triangles_per_submesh, int* nb_updated_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, int* textures_size, const int max_submesh);
     /**
     \brief Filters a mesh to removes triangles while still preserving its overall shaper (though less accurate).
     \param camera_id : id of the camera instance.
     \param filter_params : Filter level. Higher settings remore more triangles (SL_MeshFilterParameters::MESH_FILTER).
-    \param nb_ vertices : Array of the number of vertices in each submesh.
+    \param nb_vertices : Array of the number of vertices in each submesh.
     \param nb_triangles : Array of the number of triangles in each submesh.
     \param nb_sub_meshes : Number of submeshes.
     \param updated_indices : List of all submeshes updated since the last update.
@@ -741,7 +762,7 @@ extern "C" {
     \param max_submesh : Maximum number of submeshes that can be handled.
     \return True if the filtering was successful, false otherwise.
      */
-    INTERFACE_API bool sl_filter_mesh(int camera_id, enum SL_MESH_FILTER filter_params, int* nb_vertices, int* nb_triangles, int* nb_updated_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, const int max_submesh);
+    INTERFACE_API bool sl_filter_mesh(int camera_id, enum SL_MESH_FILTER filter_params, int* nb_vertices_per_submesh, int* nb_triangles_per_submesh, int* nb_updated_submeshes, int* updated_indices, int* nb_vertices_tot, int* nb_triangles_tot, const int max_submesh);
     /**
     \brief Gets a vector pointing toward the direction of gravity. This is estimated from a 3D scan of the environment,
     and such, a scan must be started and finished for this value to be calculated.
@@ -750,6 +771,58 @@ extern "C" {
     \param gravity [Out] : vector of gravity.
      */
     INTERFACE_API void sl_spatial_mapping_get_gravity_estimation(int camera_id, struct SL_Vector3 *gravity);
+
+
+    //////////////////
+
+     /**
+    \brief Updates the internal version of the whole mesh and returns the size of its data.
+    \param camera_id : id of the camera instance.
+    \param nb_vertices : Total number of updated vertices in all submeshes.
+    \param nb_triangles : Total number of updated triangles in all submeshes.
+    \return SUCCESS if the chunks are updated.
+     */
+    INTERFACE_API int sl_update_whole_mesh(int camera_id, int* nb_vertices, int* nb_triangles);
+    /**
+    \brief Retrieves the full mesh. Call update_mesh before calling this.
+    Vertex and triangles arrays must be at least of the sizes returned by update_mesh (nb_vertices and nbTriangles).
+    \param camera_id : id of the camera instance.
+    \param vertices : Vertices of the chunk
+    \param triangles : Triangles of the chunk.
+    \param uvs : uvs of the texture.
+    \param texture_ptr : Texture of the mesh (if enabled).
+    \return SUCCESS if the chunk is retrieved.
+     */
+    INTERFACE_API int sl_retrieve_whole_mesh(int camera_id, float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr);
+    /**
+    \brief Loads a saved mesh file.
+    \param camera_id : id of the camera instance.
+    \param filename : Path and filename of the mesh. Should incluse the extension (.obj, .ply or .bin).
+    \param nb_vertices :  Total number of updated vertices in all submeshes.
+    \param nb_triangles : Array of the number of triangles in each submesh.
+    \param max_submesh : Maximum number of submeshes taht can be handled.
+    \param texture_size : Array containing the sizes of all the textures (width ,height) if applicable.
+    \return True if the file was successfully loaded, false otherwise.
+     */
+    INTERFACE_API bool sl_load_whole_mesh(int camera_id, const char* filename, int* nb_vertices, int* nb_triangles, int* texture_size);
+    /**
+    \brief Applies the scanned texture onto the internal scanned mesh.
+    \param camera_id : id of the camera instance.
+    \param nb_vertices :  Total number of updated vertices in all submeshes.
+    \param nb_triangles : Array of the number of triangles in each submesh.
+    \param texture_size : Array containing the sizes of all the textures (width ,height) if applicable.
+    \return True if the texturing was successful, false otherwise.
+     */
+    INTERFACE_API bool sl_apply_whole_texture(int camera_id, int* nb_vertices, int* nb_triangles, int* texture_size);
+    /**
+    \brief Filters a mesh to removes triangles while still preserving its overall shaper (though less accurate).
+    \param camera_id : id of the camera instance.
+    \param nb_vertices :  Total number of updated vertices in all submeshes.
+    \param nb_triangles : Array of the number of triangles in each submesh.
+    \return True if the filtering was successful, false otherwise.
+     */
+    INTERFACE_API bool sl_filter_whole_mesh(int camera_id, enum SL_MESH_FILTER filter_params, int* nb_vertices, int* nb_triangles);
+
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////// Plane Detection ///////////////////////////////////////////////////////////////////////
@@ -811,7 +884,7 @@ extern "C" {
     \param height : height of the texture in pixel.
     \return "SUCCESS" if the retrieve succeeded.
      */
-    INTERFACE_API int sl_retrieve_measure(int camera_id, int* measure_ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height);
+    INTERFACE_API int sl_retrieve_measure(int camera_id, void* measure_ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height);
     /**
     \brief Retrieves an image texture from the ZED SDK in a human-viewable format. Image textures work for when you want the result to be visible,
     such as the direct RGB image from the camera, or a greyscale image of the depth. However it will lose accuracy if used to show measurements
@@ -824,8 +897,16 @@ extern "C" {
     \param height : height of the texture in pixel.
     \return "SUCCESS" if the retrieve succeeded.
      */
-    INTERFACE_API int sl_retrieve_image(int camera_id, int* image_ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height);
+    INTERFACE_API int sl_retrieve_image(int camera_id, void* image_ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height);
 
+    /**
+    \brief Convert Image format from Unsigned char to Signed char, designed for Unreal Engine pipeline, works on GPU memory.
+    \param image_in : input image to convert
+    \param image_signed : output image to converted
+    \param stream : a cuda stream to put the compute to (def. 0)
+    \note If the Output Mat does not satisfies the requirements, it is freed and re-allocated.
+    */
+    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, cudaStream_t stream);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////// Streaming Sender //////////////////////////////////////////////////////////////////////
@@ -1070,196 +1151,196 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return Ptr of the Mat.
      */
-    INTERFACE_API int* sl_mat_create_new(int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem);
+    INTERFACE_API void* sl_mat_create_new(int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem);
     /**
     \brief Creates an empty Mat with the given resolution.
     \return Ptr of the Mat.
      */
-    INTERFACE_API int* sl_mat_create_new_empty();
+    INTERFACE_API void* sl_mat_create_new_empty();
     /**
     \brief Tells if the Mat has been initialized.
     \param ptr : Ptr to the Mat.
     \return True if the Mat has been initialized.
      */
-    INTERFACE_API bool sl_mat_is_init(int* ptr);
+    INTERFACE_API bool sl_mat_is_init(void* ptr);
     /**
     \brief Frees the memory of the Mat.
     \param ptr : Ptr to the Mat.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return True if the Mat has been initialized.
      */
-    INTERFACE_API void sl_mat_free(int* ptr, enum SL_MEM mem);
+    INTERFACE_API void sl_mat_free(void* ptr, enum SL_MEM mem);
     /**
     \brief Returns information about the Mat.
     \param ptr : Ptr to the Mat.
     \param buffer : buffer providing Mat information.
      */
-    INTERFACE_API void sl_mat_get_infos(int* ptr, char* buffer);
+    INTERFACE_API void sl_mat_get_infos(void* ptr, char* buffer);
 
     // GET values
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_get_value_uchar(int* ptr, int col, int raw, unsigned char* value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_uchar(void* ptr, int col, int row, unsigned char* value, enum SL_MEM mem);
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_get_value_uchar2(int* ptr, int col, int raw, struct SL_Uchar2* value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_uchar2(void* ptr, int col, int row, struct SL_Uchar2* value, enum SL_MEM mem);
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_get_value_uchar3(int* ptr, int col, int raw, struct SL_Uchar3 * value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_uchar3(void* ptr, int col, int row, struct SL_Uchar3 * value, enum SL_MEM mem);
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int mat_get_value_uchar4(int* ptr, int col, int raw, struct SL_Uchar4* value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_uchar4(void* ptr, int col, int row, struct SL_Uchar4* value, enum SL_MEM mem);
 
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_get_value_float(int* ptr, int col, int raw, float* value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_float(void* ptr, int col, int row, float* value, enum SL_MEM mem);
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_get_value_float2(int* ptr, int col, int raw, struct SL_Vector2 * value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_float2(void* ptr, int col, int row, struct SL_Vector2 * value, enum SL_MEM mem);
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_get_value_float3(int* ptr, int col, int raw, struct SL_Vector3 * value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_float3(void* ptr, int col, int row, struct SL_Vector3 * value, enum SL_MEM mem);
     /**
     \brief Returns the value of a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_get_value_float4(int* ptr, int col, int raw, struct SL_Vector4 * value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_get_value_float4(void* ptr, int col, int row, struct SL_Vector4 * value, enum SL_MEM mem);
 
     // SET VALUE
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value : the value to be set.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_value_uchar(int* ptr, int col, int raw, unsigned char value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_uchar(void* ptr, int col, int row, unsigned char value, enum SL_MEM mem);
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int mat_set_value_uchar2(int* ptr, int col, int raw, struct SL_Uchar2 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_uchar2(void* ptr, int col, int row, struct SL_Uchar2 value, enum SL_MEM mem);
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value [Out] : the value to get.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_value_uchar3(int* ptr, int col, int raw, struct SL_Uchar3 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_uchar3(void* ptr, int col, int row, struct SL_Uchar3 value, enum SL_MEM mem);
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value : the value to be set.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_value_uchar4(int* ptr, int col, int raw, struct SL_Uchar4 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_uchar4(void* ptr, int col, int row, struct SL_Uchar4 value, enum SL_MEM mem);
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value : the value to be set.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_value_float(int* ptr, int col, int raw, float value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_float(void* ptr, int col, int row, float value, enum SL_MEM mem);
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value : the value to be set.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_value_float2(int* ptr, int col, int raw, struct SL_Vector2 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_float2(void* ptr, int col, int row, struct SL_Vector2 value, enum SL_MEM mem);
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value : the value to be set.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_value_float3(int* ptr, int col, int raw, struct SL_Vector3 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_float3(void* ptr, int col, int row, struct SL_Vector3 value, enum SL_MEM mem);
     /**
     \brief Sets a value to a specific point in the matrix.
     \param ptr : Ptr to the Mat.
     \param col : specifies the column.
-    \param raw : specifices the row.
+    \param row : specifices the row.
     \param value : the value to be set.
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_value_float4(int* ptr, int col, int raw, struct SL_Vector4 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_value_float4(void* ptr, int col, int row, struct SL_Vector4 value, enum SL_MEM mem);
 
     //SET TO
     /**
@@ -1269,7 +1350,7 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_uchar(int* ptr, unsigned char value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_to_uchar(void* ptr, unsigned char value, enum SL_MEM mem);
     /**
     \brief Fills the entire Mat with the given value.
     \param ptr : Ptr to the Mat.
@@ -1277,7 +1358,7 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_uchar2(int* ptr, struct SL_Uchar2 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_to_uchar2(void* ptr, struct SL_Uchar2 value, enum SL_MEM mem);
     /**
     \brief Fills the entire Mat with the given value.
     \param ptr : Ptr to the Mat.
@@ -1285,7 +1366,7 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_uchar3(int* ptr, struct SL_Uchar3 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_to_uchar3(void* ptr, struct SL_Uchar3 value, enum SL_MEM mem);
     /**
     \brief Fills the entire Mat with the given value.
     \param ptr : Ptr to the Mat.
@@ -1293,7 +1374,7 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_uchar4(int* ptr, struct SL_Uchar4 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_to_uchar4(void* ptr, struct SL_Uchar4 value, enum SL_MEM mem);
     /**
     \brief Fills the entire Mat with the given value.
     \param ptr : Ptr to the Mat.
@@ -1301,7 +1382,7 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_float(int* ptr, float value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_to_float(void* ptr, float value, enum SL_MEM mem);
     /**
     \brief Fills the entire Mat with the given value.
     \param ptr : Ptr to the Mat.
@@ -1309,7 +1390,7 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_float2(int* ptr, struct SL_Vector2 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_to_float2(void* ptr, struct SL_Vector2 value, enum SL_MEM mem);
     /**
     \brief Fills the entire Mat with the given value.
     \param ptr : Ptr to the Mat.
@@ -1317,7 +1398,7 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_float3(int* ptr, struct SL_Vector3 value, enum SL_MEM mem);
+    INTERFACE_API int sl_mat_set_to_float3(void* ptr, struct SL_Vector3 value, enum SL_MEM mem);
     /**
     \brief Fills the entire Mat with the given value.
     \param ptr : Ptr to the Mat.
@@ -1325,20 +1406,20 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_to_float4(int* ptr, struct SL_Vector4 value, enum SL_MEM mem);
-
+    INTERFACE_API int sl_mat_set_to_float4(void* ptr, struct SL_Vector4 value, enum SL_MEM mem);
+	
     /**
     \brief Copies data from the GPU to the CPU, if possible.
     \param ptr : Ptr to the Mat.
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_update_cpu_from_gpu(int* ptr);
+    INTERFACE_API int sl_mat_update_cpu_from_gpu(void* ptr);
     /**
     \brief Copies data from the CPU to the GPU, if possible.
     \param ptr : Ptr to the Mat.
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_update_gpu_from_cpu(int* ptr);
+    INTERFACE_API int sl_mat_update_gpu_from_cpu(void* ptr);
     /**
     \brief Copies data from this Mat to another Mat (deep copy).
     \param ptr : Ptr to the Source Mat.
@@ -1346,7 +1427,7 @@ extern "C" {
     \param cpy_type : The To and From memory types (see \ref SL_COPY_TYPE).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_copy_to(int* ptr, int* ptr_dest, enum SL_COPY_TYPE cpy_type);
+    INTERFACE_API int sl_mat_copy_to(void* ptr, void* ptr_dest, enum SL_COPY_TYPE cpy_type);
 
     /**
     \brief Reads an image from a file. Supports .png and .jpeg. Only works if Mat has access to MEM_CPU.
@@ -1354,73 +1435,80 @@ extern "C" {
     \param file_path : File path, including file name and extension.
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_read(int* ptr, const char* file_path);
+    INTERFACE_API int sl_mat_read(void* ptr, const char* file_path);
     /**
     \brief Writes the Mat into a file as an image. Only works if Mat has access to MEM_CPU.
     \param ptr : Ptr to the Mat.
     \param file_path : File path, including file name and extension.
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_write(int* ptr, const char* file_path);
+    INTERFACE_API int sl_mat_write(void* ptr, const char* file_path);
     /**
     \brief Gets the Width of the matrix.
     \param ptr : Ptr to the Mat.
     \return The width of the matrix.
      */
-    INTERFACE_API int sl_mat_get_width(int* ptr);
+    INTERFACE_API int sl_mat_get_width(void* ptr);
     /**
     \brief Gets the Height of the matrix.
     \param ptr : Ptr to the Mat.
     \return The height of the matrix.
      */
-    INTERFACE_API int sl_mat_get_height(int* ptr);
+    INTERFACE_API int sl_mat_get_height(void* ptr);
     /**
     \brief Gets the number of channels stored in each pixel.
     \param ptr : Ptr to the Mat.
     \return Number of values/channels.
      */
-    INTERFACE_API int sl_mat_get_channels(int* ptr);
+    INTERFACE_API int sl_mat_get_channels(void* ptr);
     /**
     \brief Gets the type of memory (CPU and/or GPU).
     \param ptr : Ptr to the Mat.
     \return The memory type (SL_MEM).
      */
-    INTERFACE_API int sl_mat_get_memory_type(int* ptr);
+    INTERFACE_API int sl_mat_get_memory_type(void* ptr);
+
+    /**
+    \brief Gets the type of data (Mat_Type).
+    \param ptr : Ptr to the Mat.
+    \return The memory type (SL_MAT_TYPE).
+     */
+    INTERFACE_API int sl_mat_get_data_type(void* ptr);
     /**
     \brief Gets the size in bytes of one pixel.
     \param ptr : Ptr to the Mat.
     \return The size in bytes of one pixel.
      */
-    INTERFACE_API int sl_mat_get_pixel_bytes(int* ptr);
+    INTERFACE_API int sl_mat_get_pixel_bytes(void* ptr);
     /**
     \brief Gets the memory 'step' in number/length of elements - how many values make up each row of pixels.
     \param ptr : Ptr to the Mat.
     \return The Step length.
      */
-    INTERFACE_API int sl_mat_get_step(int* ptr);
+    INTERFACE_API int sl_mat_get_step(void* ptr, enum SL_MEM mem);
     /**
     \brief Gets the memory 'step' in bytes - how many bytes make up each row of pixels.
     \param ptr : Ptr to the Mat.
     \return The Step length in bytes.
      */
-    INTERFACE_API int sl_mat_get_step_bytes(int* ptr);
+    INTERFACE_API int sl_mat_get_step_bytes(void* ptr, enum SL_MEM mem);
     /**
     \brief Gets the size of each row in bytes.
     \param ptr : Ptr to the Mat.
     \return The size of each row in bytes.
      */
-    INTERFACE_API int sl_mat_get_width_bytes(int* ptr);
+    INTERFACE_API int sl_mat_get_width_bytes(void* ptr);
     /**
     \brief Returns whether the Mat is the owner of the memory it's accessing.
     \return True if the Mat is the owner of the memory it's accessing.
      */
-    INTERFACE_API bool sl_mat_is_memory_owner(int* ptr);
+    INTERFACE_API bool sl_mat_is_memory_owner(void* ptr);
     /**
     \brief Returns the resolution of the image that this Mat holds.
     \param ptr : Ptr to the Mat.
     \return The resolution of the mat.
      */
-    INTERFACE_API struct SL_Resolution sl_mat_get_resolution(int* ptr);
+    INTERFACE_API struct SL_Resolution sl_mat_get_resolution(void* ptr);
     /**
     \brief Allocates memory for the Mat.
     \param ptr : Ptr to the Mat.
@@ -1429,7 +1517,7 @@ extern "C" {
     \param type : Data type and number of channels the Mat will hold (see \ref SL_MAT_TYPE).
     \param mem : Whether Mat should exist on CPU or GPU memory ( \ref SL_MEM).
      */
-    INTERFACE_API void sl_mat_alloc(int* ptr, int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem);
+    INTERFACE_API void sl_mat_alloc(void* ptr, int width, int height, enum SL_MAT_TYPE type, enum SL_MEM mem);
     /**
     \brief Copies data from another Mat into this one(deep copy).
     \param ptr : Ptr to the Mat.
@@ -1438,20 +1526,27 @@ extern "C" {
     \param mem : Whether Mat should exist on CPU or GPU memory (SL_MEM).
     \return ERROR_CODE::SUCCESS if everything went well, ERROR_CODE::FAILURE otherwise.
      */
-    INTERFACE_API int sl_mat_set_from(int* ptr, int* ptr_source, enum SL_COPY_TYPE copy_type);
+    INTERFACE_API int sl_mat_set_from(void* ptr, void* ptr_source, enum SL_COPY_TYPE copy_type);
     /**
     \brief Gets a pointer to the Mat.
     \param ptr : Ptr to the Mat.
     \param mem : Whether Mat should exist on CPU or GPU memory ( \ref SL_MEM).
     \return A pointer to the Mat.
      */
-    INTERFACE_API int* sl_mat_get_ptr(int* ptr, enum SL_MEM mem);
+    INTERFACE_API int* sl_mat_get_ptr(void* ptr, enum SL_MEM mem);
     /**
     \brief Duplicates a Mat by copying all its data into a new one (deep copy).
     \param ptr : Ptr to the Mat.
     \param ptr_srouce : Source Mat from which to copy.
      */
-    INTERFACE_API void sl_mat_clone(int* ptr, int* ptr_source);
+    INTERFACE_API int sl_mat_clone(void* ptr, void* ptr_source);
+
+    /**
+    \brief Swaps the content of the provided Mat (only swaps the pointers, no data copy).
+    \param ptr1 : Ptr to the first Mat.
+    \param ptr2 : Ptr to the second Mat.
+    */
+    INTERFACE_API void sl_mat_swap(void* ptr_1, void* ptr_2);
 
 #ifdef __cplusplus
 }
