@@ -302,7 +302,7 @@ enum SL_MODEL {
 	SL_MODEL_ZED, /**< Defines ZED Camera model */
 	SL_MODEL_ZED_M, /**<  Defines ZED Mini (ZED-M) Camera model */
 	SL_MODEL_ZED2, /**< Defines ZED 2 Camera model */
-	SL_MODEL_ZED2i /**< Defines ZED 2i Camera model */
+	SL_MODEL_ZED2i, /**< Defines ZED 2i Camera model */
 };
 
 /**
@@ -458,6 +458,7 @@ enum SL_POSITIONAL_TRACKING_STATE {
 	SL_POSITIONAL_TRACKING_STATE_OK, /** Positional tracking is working normally.*/
 	SL_POSITIONAL_TRACKING_STATE_OFF, /** Positional tracking is not enabled.*/
 	SL_POSITIONAL_TRACKING_STATE_FPS_TOO_LOW, /** Effective FPS is too low to give proper results for motion tracking. Consider using PERFORMANCES parameters (DEPTH_MODE_PERFORMANCE, low camera resolution (VGA,HD720))*/
+	SL_POSITIONAL_TRACKING_STATE_SEARCHING_FLOOR_PLANE, /**< The camera is searching for the floor plane to locate itself related to it, the REFERENCE_FRAME::WORLD will be set afterward.*/
 };
 
 /**
@@ -578,7 +579,8 @@ enum SL_MAT_TYPE
 	SL_MAT_TYPE_U8_C2,  /**< unsigned char 2 channels.*/
 	SL_MAT_TYPE_U8_C3,  /**< unsigned char 3 channels.*/
 	SL_MAT_TYPE_U8_C4,  /**< unsigned char 4 channels.*/
-	SL_MAT_TYPE_U16_C1  /**< unsigned short 1 channel.*/
+	SL_MAT_TYPE_U16_C1,  /**< unsigned short 1 channel.*/
+	SL_MAT_TYPE_S8_C4 /**< signed char 4 channels.*/
 };
 
 /**
@@ -1181,7 +1183,10 @@ struct SL_PositionalTrackingParameters
 	 * default : -1 which means no minimum depth
 	 */
 	float depth_min_range;
-
+	/**
+	 * @brief This setting allows you to override 2 of the 3 rotations from initial_world_transform using the IMU gravity
+	 */
+	bool set_gravity_as_origin;
 };
 
 /**
@@ -1189,19 +1194,19 @@ struct SL_PositionalTrackingParameters
  */
 struct SL_RecordingStatus {
 	/**< Recorder status, true if enabled */
-	bool is_recording; 
+	bool is_recording;
 	/**< Recorder status, true if the pause is enabled */
-	bool is_paused; 
+	bool is_paused;
 	/**< Status of current frame. True for success or false if the frame couldn't be written in the SVO file.*/
-	bool status; 
+	bool status;
 	/**< Compression time for the current frame in ms.*/
-	double current_compression_time; 
+	double current_compression_time;
 	/**< Compression ratio (% of raw size) for the current frame.*/
-	double current_compression_ratio; 
+	double current_compression_ratio;
 	/**< Average compression time in ms since beginning of recording.*/
 	double average_compression_time;
 	/**< Average compression ratio (% of raw size) since beginning of recording.*/
-	double average_compression_ratio; 
+	double average_compression_ratio;
 };
 
 /**
@@ -1470,6 +1475,17 @@ struct SL_ObjectDetectionParameters
 	\brief Defines the filtering mode that should be applied to raw detections.
 	*/
 	enum SL_OBJECT_FILTERING_MODE filtering_mode;
+	/**
+	* @brief When an object is not detected anymore, the SDK will predict its positions during a short period of time before switching its state to SEARCHING.
+	* \n It prevents the jittering of the object state when there is a short misdetection. The user can define its own prediction time duration.
+	*
+	* \note During this time, the object will have OK state even if it is not detected.
+	* \note the duration is expressed in seconds
+	* \warning the prediction_timeout_s will be clamped to 1 second as the prediction is getting worst with time.
+	* \warning set this parameter to 0 to disable SDK predictions
+	* defulat : 0.2f
+	*/
+	float prediction_timeout_s;
 };
 
 /**
@@ -1504,7 +1520,7 @@ struct SL_ObjectDetectionRuntimeParameters
 	/**
 	\brief Select which object types to detect and track. By default all classes are tracked.
 	 * Fewer object types can slightly speed up the process, since every objects are tracked.
-	 * Only the selected classes in the vector will be output.
+	 * Only the selected classes in the vector wilviewl be output.
 
 	 In order to get all the available classes, the filter vector must be empty.
 	 */

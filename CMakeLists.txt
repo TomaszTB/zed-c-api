@@ -27,12 +27,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 link_directories(${ZED_LIBRARY_DIR})
 link_directories(${CUDA_LIBRARY_DIRS})
 
-if (WIN32)
-	STRING(REGEX REPLACE "cudart.lib" ""  CUDA_CUDART_LIBRARY_STATIC ${CUDA_CUDART_LIBRARY})
-	SET(CUDA_CUDART_LIBRARY_STATIC "${CUDA_CUDART_LIBRARY_STATIC}cudart_static.lib")
-	message("cudart static :  ${CUDA_CUDART_LIBRARY_STATIC}")
-endif(WIN32)
-
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11")
 

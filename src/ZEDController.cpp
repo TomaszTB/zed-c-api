@@ -94,7 +94,7 @@ int ZEDController::initFromSVO(SL_InitParameters *params, const char* path_svo, 
     sprintf(buffer_verbose, "ENTER ZEDController::initFromSVO %d = %d", params->camera_device_id, camera_ID);
 
 
-    if (sl::String(path_svo) == NULL) {
+    if (sl::String(path_svo).empty()) {
         sprintf(buffer_verbose, "Invalid SVO Path");
         return (int) sl::ERROR_CODE::INVALID_SVO_FILE;
     }
@@ -128,7 +128,7 @@ int ZEDController::initFromStream(SL_InitParameters *params, const char* ip, int
         return 0;
     }
 
-    if (sl::String(ip) == NULL) {
+    if (sl::String(ip).empty()) {
         sprintf(buffer_verbose, "Invalid IP address");
         return (int) sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
@@ -259,6 +259,8 @@ SL_PositionalTrackingParameters* ZEDController::getPositionalTrackingParameters(
     c_trackingParams->initial_world_rotation = quat;
     c_trackingParams->set_as_static = trackingParams.set_as_static;
     c_trackingParams->set_floor_as_origin = trackingParams.set_floor_as_origin;
+    c_trackingParams->depth_min_range = trackingParams.depth_min_range;
+    c_trackingParams->set_gravity_as_origin = trackingParams.set_gravity_as_origin;
     return c_trackingParams;
 }
 
@@ -289,7 +291,7 @@ void ZEDController::disableTracking(const char *path) {
 }
 
 sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin,
-        bool set_as_static, bool enable_imu_fusion, const char* area_file_path) {
+        bool set_as_static, bool enable_imu_fusion, float depth_min_range, bool set_gravity_as_origin, const char* area_file_path) {
     if (!isNull()) {
         sl::PositionalTrackingParameters params;
         sl::Transform motion;
@@ -313,6 +315,8 @@ sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_
         params.set_floor_as_origin = set_floor_as_origin;
         params.set_as_static = set_as_static;
         params.enable_imu_fusion = enable_imu_fusion;
+        params.depth_min_range = depth_min_range;
+        params.set_gravity_as_origin = set_gravity_as_origin;
 
         if (area_file_path != nullptr) {
             if (std::string(area_file_path) != "") {
@@ -1408,6 +1412,112 @@ bool ZEDController::applyTexture(int* numVertices, int* numTriangles, int* numUp
 
     return false;
 
+sl::ERROR_CODE ZEDController::updateWholeMesh(int* nb_vertices, int* nb_triangles) {
+    if (!isNull() && !isTextured) {
+        if (zed.getSpatialMapRequestStatusAsync() == sl::ERROR_CODE::SUCCESS) {
+            sl::ERROR_CODE v = zed.retrieveSpatialMapAsync(mesh);
+            if (v != sl::ERROR_CODE::SUCCESS)
+                return v;
+
+            *nb_vertices = mesh.vertices.size();
+            *nb_triangles = mesh.triangles.size();
+
+            isMeshUpdated = true;
+            return v;
+        }
+        return sl::ERROR_CODE::FAILURE;
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+
+}
+
+sl::ERROR_CODE ZEDController::retrieveWholeMesh(float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr) {
+    if (!isNull() && !isTextured) {
+        if (isMeshUpdated) {
+
+            bool isTextureCalled = areTextureReady && uvs != nullptr && texture_ptr != nullptr;
+            if (isTextureCalled) {
+                //texture_ptr = mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU);
+                memcpy(&texture_ptr[0], mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU), mesh.texture.getStepBytes() * mesh.texture.getHeight());
+            }
+
+            memcpy(&vertices[0] , mesh.vertices.data()  , sizeof(sl::float3) * int(mesh.vertices.size()));
+            memcpy(&uvs[0], mesh.uv.data(), sizeof(sl::float2) * int(mesh.uv.size()));
+            memcpy(&triangles[0], mesh.triangles.data() , sizeof(sl::uint3)  * int(mesh.triangles.size()));
+
+            if (areTextureReady && uvs != nullptr && texture_ptr != nullptr) {
+                isTextured = true;
+            }
+            return sl::ERROR_CODE::SUCCESS;
+        }
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
+bool ZEDController::loadWholeMesh(const char* filename, int* nb_vertices, int* nb_triangles, int* texture_size) {
+    if (mesh.load(filename, false)) {
+
+        *nb_vertices = 0;
+        *nb_triangles = 0;
+
+        if (mesh.texture.isInit() && texture_size != nullptr) {
+            texture_size[1] = mesh.texture.getHeight();
+            texture_size[0] = mesh.texture.getWidth();
+        }
+
+        *nb_vertices = mesh.vertices.size();
+        *nb_triangles = mesh.triangles.size();
+
+        isMeshUpdated = true;
+
+        if (mesh.texture.isInit() && texture_size != nullptr) {
+            areTextureReady = true;
+        }
+        else {
+            texture_size[0] = -1;
+        }
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+bool ZEDController::applyWholeTexture(int* nb_vertices, int* nb_triangles, int* texture_size) {
+    if (mesh.applyTexture(sl::MESH_TEXTURE_FORMAT::RGBA)) {
+
+        *nb_vertices = 0;
+        *nb_triangles = 0;
+
+        *nb_vertices = mesh.vertices.size();
+        *nb_triangles = mesh.triangles.size();
+
+        texture_size[0] = mesh.texture.getWidth();
+        texture_size[1] = mesh.texture.getHeight();
+        isMeshUpdated = true;
+        areTextureReady = true;
+        return true;
+    }
+
+    return false;
+}
+
+bool ZEDController::filterWholeMesh(sl::MeshFilterParameters::MESH_FILTER filter_param, int* nb_vertices, int* nb_triangles) {
+    if (!isNull() && !isTextured) {
+        if (mesh.filter(sl::MeshFilterParameters(filter_param), false)) {
+
+            *nb_vertices = 0;
+            *nb_triangles = 0;
+
+            *nb_vertices = mesh.vertices.size();
+            *nb_triangles = mesh.triangles.size();
+
+            isMeshUpdated = true;
+            return true;
+        }
+        return false;
+    }
+    return false;
 }
 
 sl::ERROR_CODE ZEDController::enableStreaming(sl::STREAMING_CODEC codec, unsigned int bitrate, unsigned short port, int gopSize, bool adaptativeBitrate, int chunk_size, int target_framerate) {
@@ -1507,6 +1617,7 @@ sl::ERROR_CODE ZEDController::enableObjectDetection(SL_ObjectDetectionParameters
 		params.body_format = (sl::BODY_FORMAT)obj_params->body_format;
         params.detection_model = (sl::DETECTION_MODEL)obj_params->model;
 		params.filtering_mode = (sl::OBJECT_FILTERING_MODE)obj_params->filtering_mode;
+        params.prediction_timeout_s = obj_params->prediction_timeout_s;
         if (obj_params->max_range > 0)
             params.max_range = obj_params->max_range;
 
@@ -1550,6 +1661,7 @@ SL_ObjectDetectionParameters* ZEDController::getObjectDetectionParameters() {
 	c_odParams->image_sync = odParams.image_sync;
 	c_odParams->max_range = odParams.max_range;
 	c_odParams->model = (SL_DETECTION_MODEL)odParams.detection_model;
+    c_odParams->prediction_timeout_s = odParams.prediction_timeout_s;
 
 	return c_odParams;
 }
