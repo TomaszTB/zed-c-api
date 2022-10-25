@@ -1,7 +1,7 @@
 #ifndef __ZED_CONTROLLER_H__
 #define __ZED_CONTROLLER_H__
 
-
+#include <memory>
 #include <sl/Camera.hpp>
 #ifdef _WIN32
 #include <Windows.h>
@@ -103,7 +103,13 @@ public:
     bool filterMesh(sl::MeshFilterParameters::MESH_FILTER filterParams, int* numVertices, int* numTriangles, int* numUpdatedSubmeshes, int* updatedIndices, int* numVerticesTot, int* numTrianglesTot, const int maxSubmesh);
     sl::ERROR_CODE retrieveMesh(float* vertices, int* triangles, const int maxSubmesh, float* uvs, unsigned char* texturePtr);
     sl::ERROR_CODE updateChunks(int* numVertices, int* numTriangles, int* numSubmeshes, int* updatedIndices, int* numVerticesTot, int* numTrianglesTot, const int maxSubmesh);
-    sl::ERROR_CODE retrieveChunks(const int maxSubmesh, float* vertices, int* triangles);
+    sl::ERROR_CODE retrieveChunks(const int maxSubmesh, float* vertices, int* triangles, float* uvs, unsigned char* texturePtr);
+
+    sl::ERROR_CODE updateWholeMesh(int* nb_vertices, int* nb_triangles);
+    sl::ERROR_CODE retrieveWholeMesh(float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr);
+    bool loadWholeMesh(const char* filename, int* nb_vertices, int* nb_triangles, int* texture_size);
+    bool applyWholeTexture(int* nb_vertices, int* nb_triangles, int* texture_size);
+    bool filterWholeMesh(sl::MeshFilterParameters::MESH_FILTER filter_param, int* nb_vertices, int* nb_triangles);
 
     sl::ERROR_CODE updateFusedPointCloud(int* numPointsTot);
     sl::ERROR_CODE retrieveFusedPointCloud(float* vertices);

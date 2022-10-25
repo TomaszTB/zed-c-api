@@ -20,135 +20,135 @@
  * \brief Quaternion
  */
 struct SL_Quaternion {
-    float x;
-    float y;
-    float z;
-    float w;
+	float x;
+	float y;
+	float z;
+	float w;
 };
 
 /**
 * \brief Vector2
 */
 struct SL_Vector2 {
-    float x;
-    float y;
+	float x;
+	float y;
 };
 
 /**
 * \brief Vector3
 */
 struct SL_Vector3 {
-    float x;
-    float y;
-    float z;
+	float x;
+	float y;
+	float z;
 };
 
 /**
 * \brief Vector4
 */
 struct SL_Vector4 {
-    float x;
-    float y;
-    float z;
-    float w;
+	float x;
+	float y;
+	float z;
+	float w;
 };
 
 /**
 * \brief uchar2
 */
 struct SL_Uchar2 {
-    unsigned char x;
-    unsigned char y;
+	unsigned char x;
+	unsigned char y;
 };
 
 /**
 * \brief uchar3
 */
 struct SL_Uchar3 {
-    unsigned char x;
-    unsigned char y;
-    unsigned char z;
+	unsigned char x;
+	unsigned char y;
+	unsigned char z;
 };
 
 /**
 * \brief uchar4
 */
 struct SL_Uchar4 {
-    unsigned char x;
-    unsigned char y;
-    unsigned char z;
-    unsigned char w;
+	unsigned char x;
+	unsigned char y;
+	unsigned char z;
+	unsigned char w;
 };
 
 /**
 * \brief Matric4x4
 */
 struct SL_Matrix4f {
-    float p[16];
+	float p[16];
 };
 
 /**
 * \brief Matrix3x3
 */
 struct SL_Matrix3f {
-    float p[9];
+	float p[9];
 };
 
 struct SL_PoseData {
-    bool valid;
-    unsigned long long timestamp;
-    struct SL_Quaternion rotation;
-    struct SL_Vector3 translation;
-    int pose_confidence;
+	bool valid;
+	unsigned long long timestamp;
+	struct SL_Quaternion rotation;
+	struct SL_Vector3 translation;
+	int pose_confidence;
 	float pose_covariance[36];
 	float twist[6];
 	float twist_covariance[36];
 };
 
 enum UNITY_PLAN_TYPE {
-    UNITY_PLAN_TYPE_FLOOR,
-    UNITY_PLAN_TYPE_HIT_HORIZONTAL,
-    UNITY_PLAN_TYPE_HIT_VERTICAL,
-    UNITY_PLAN_TYPE_HIT_UNKNOWN
+	UNITY_PLAN_TYPE_FLOOR,
+	UNITY_PLAN_TYPE_HIT_HORIZONTAL,
+	UNITY_PLAN_TYPE_HIT_VERTICAL,
+	UNITY_PLAN_TYPE_HIT_UNKNOWN
 };
 
 struct SL_PlaneData {
-    int error_code;
-    enum UNITY_PLAN_TYPE type;
-    struct SL_Vector3 plane_normal;
-    struct SL_Vector3 plane_center;
-    struct SL_Vector3 plane_transform_position;
-    struct SL_Quaternion plane_transform_orientation;
-    struct SL_Vector4 plane_equation;
-    struct SL_Vector2 extents;
-    int bounds_size;
-    struct SL_Vector3 bounds[256]; //max 256 points but only BoundsSize are actually filled
+	int error_code;
+	enum UNITY_PLAN_TYPE type;
+	struct SL_Vector3 plane_normal;
+	struct SL_Vector3 plane_center;
+	struct SL_Vector3 plane_transform_position;
+	struct SL_Quaternion plane_transform_orientation;
+	struct SL_Vector4 plane_equation;
+	struct SL_Vector2 extents;
+	int bounds_size;
+	struct SL_Vector3 bounds[256]; //max 256 points but only BoundsSize are actually filled
 };
 
 /**
 * \brief IMU Data structure
 */
 struct SL_IMUData {
-    bool is_available;
-    unsigned long long timestamp_ns;
-    struct SL_Vector3 angular_velocity;
-    struct SL_Vector3 linear_acceleration;
-    struct SL_Vector3 angular_velocity_unc; //uncalibrated
-    struct SL_Vector3 linear_acceleration_unc; //uncalibrated
-    struct SL_Quaternion orientation;
-    struct SL_Matrix3f orientation_covariance;
-    struct SL_Matrix3f angular_velocity_convariance;
-    struct SL_Matrix3f linear_acceleration_convariance;
+	bool is_available;
+	unsigned long long timestamp_ns;
+	struct SL_Vector3 angular_velocity;
+	struct SL_Vector3 linear_acceleration;
+	struct SL_Vector3 angular_velocity_unc; //uncalibrated
+	struct SL_Vector3 linear_acceleration_unc; //uncalibrated
+	struct SL_Quaternion orientation;
+	struct SL_Matrix3f orientation_covariance;
+	struct SL_Matrix3f angular_velocity_convariance;
+	struct SL_Matrix3f linear_acceleration_convariance;
 };
 
 /**
 * \brief Barometer Data structure
 */
 struct SL_BarometerData {
-    bool is_available;
-    unsigned long long timestamp_ns;
-    float pressure;
-    float relative_altitude;
+	bool is_available;
+	unsigned long long timestamp_ns;
+	float pressure;
+	float relative_altitude;
 };
 
 /**
@@ -181,23 +181,23 @@ struct SL_MagnetometerData {
 * \brief Temperature Data structure
 */
 struct SL_TemperatureData {
-    float imu_temp;
-    float barometer_temp;
-    float onboard_left_temp;
-    float onboard_right_temp;
+	float imu_temp;
+	float barometer_temp;
+	float onboard_left_temp;
+	float onboard_right_temp;
 };
 
 /**
 * \brief Sensor Data structure
 */
 struct SL_SensorData {
-    //IMU data
-    struct SL_IMUData imu;
-    struct SL_BarometerData barometer;
-    struct SL_MagnetometerData magnetometer;
-    struct SL_TemperatureData temperature;
-    int camera_moving_state;
-    int image_sync_trigger;
+	//IMU data
+	struct SL_IMUData imu;
+	struct SL_BarometerData barometer;
+	struct SL_MagnetometerData magnetometer;
+	struct SL_TemperatureData temperature;
+	int camera_moving_state;
+	int image_sync_trigger;
 };
 
 enum USB_DEVICE {
@@ -394,6 +394,8 @@ enum SL_VIDEO_SETTINGS {
 	SL_VIDEO_SETTINGS_LAST
 };
 
+const int SL_VIDEO_SETTINGS_VALUE_AUTO = -1;
+
 /**
 \brief Lists retrievable measures.
 */
@@ -416,7 +418,7 @@ enum SL_MEASURE {
 	SL_MEASURE_XYZABGR_RIGHT, /** Colored point cloud for right sensor. Each pixel contains 4 float (X, Y, Z, color). The color need to be read as an unsigned char[4] representing the ABGR color. SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_NORMALS_RIGHT, /** Normals vector for right view. Each pixel contains 4 float (X, Y, Z, 0).  SL_MAT_TYPE_F32_C4.*/
 	SL_MEASURE_DEPTH_U16_MM, /** Depth map in millimeter whatever the SL_UNIT defined in SL_InitParameters. Invalid values are set to 0, depth values are clamped at 65000.  Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
-	SL_MEASURE_DEPTH_U16_MM_RIGHT, /** Depth map in millimeter for right sensor. Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
+	SL_MEASURE_DEPTH_U16_MM_RIGHT /** Depth map in millimeter for right sensor. Each pixel  contains 1 unsigned short. SL_MAT_TYPE_U16_C1.*/
 };
 
 /**
@@ -436,7 +438,7 @@ enum SL_VIEW {
 	SL_VIEW_CONFIDENCE, /** Color rendering of the depth confidence. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
 	SL_VIEW_NORMALS, /** Color rendering of the normals. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
 	SL_VIEW_DEPTH_RIGHT, /** Color rendering of the right depth mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
-	SL_VIEW_NORMALS_RIGHT, /** Color rendering of the normals mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
+	SL_VIEW_NORMALS_RIGHT /** Color rendering of the normals mapped on right sensor. Each pixel contains 4 unsigned char (B,G,R,A). SL_MAT_TYPE_U8_C4. */
 };
 
 /**
@@ -635,7 +637,7 @@ enum SL_DETECTION_MODEL {
 	SL_DETECTION_MODEL_MULTI_CLASS_BOX_MEDIUM, /**< Any objects, bounding box based, compromise between accuracy and speed */
 	SL_DETECTION_MODEL_HUMAN_BODY_MEDIUM, /**<  Keypoints based, specific to human skeleton, compromise between accuracy and speed */
 	SL_DETECTION_MODEL_PERSON_HEAD_BOX, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environement, the person localization is also improved */
-	SL_DETECTION_MODEL_PERSON_HEAD_BOX_ACCURATE, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environement, the person localization is also improved */
+	SL_DETECTION_MODEL_PERSON_HEAD_BOX_ACCURATE, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environments, the person localization is also improved, state of the art accuracy */
 	SL_DETECTION_MODEL_CUSTOM_BOX_OBJECTS /**< For external inference, using your own custom model and/or frameworks. This mode disable the internal inference engine, the 2D bounding box detection must be provided */
 };
 
@@ -664,14 +666,14 @@ enum SL_OBJECT_FILTERING_MODE {
 	 * \brief SDK will not apply any preprocessing to the detected objects
 	 */
 	SL_OBJECT_FILTERING_MODE_NONE,
-    /**
-     * \brief SDK will remove objects that are in the same 3D position as an already tracked object (independant of class ID)
-     */
-    SL_OBJECT_FILTERING_MODE_NMS_3D,
-    /**
-     * \brief SDK will remove objects that are in the same 3D position as an already tracked object of the same class ID
-     */
-    SL_OBJECT_FILTERING_MODE_NMS_3D_PER_CLASS
+	/**
+	 * \brief SDK will remove objects that are in the same 3D position as an already tracked object (independant of class ID)
+	 */
+	 SL_OBJECT_FILTERING_MODE_NMS_3D,
+	 /**
+	  * \brief SDK will remove objects that are in the same 3D position as an already tracked object of the same class ID
+	  */
+	  SL_OBJECT_FILTERING_MODE_NMS_3D_PER_CLASS
 };
 
 
@@ -691,7 +693,7 @@ enum SL_BODY_FORMAT
 	 * \note local keypoint angle and position are available
 	 * \warning The SDK will automatically enable fitting.
 	 */
-	SL_BODY_FORMAT_POSE_34,
+	 SL_BODY_FORMAT_POSE_34,
 };
 
 /**
@@ -789,6 +791,7 @@ struct SL_InitParameters
 	This parameter allows you to select to desired input.
 	*/
 	enum  SL_INPUT_TYPE input_type;
+
 	/**
 	Define the chosen camera resolution. Small resolutions offer higher framerate and lower computation time (SL_RESOLUTION).\n
 	In most situations, the \ref RESOLUTION "RESOLUTION_HD720" at 60 fps is the best balance between image quality and framerate.\n
@@ -796,6 +799,7 @@ struct SL_InitParameters
 	\n default : \ref RESOLUTION "RESOLUTION_HD720"
 	 */
 	enum  SL_RESOLUTION resolution;
+
 	/**
 	Requested camera frame rate. If set to 0, the highest FPS of the specified \ref camera_resolution will be used.\n
 	See \ref RESOLUTION for a list of supported framerates.
@@ -803,26 +807,29 @@ struct SL_InitParameters
 	\note If the requested camera_fps is unsupported, the closest available FPS will be used.
 	 */
 	int camera_fps;
+
 	/**
 	Id of the Camera.
 	*/
 	int camera_device_id;
+
 	/**
 	If you are using the camera upside down, setting this parameter to FLIP_MODE_ON will cancel its rotation. The images will be horizontally flipped.
 	\n default : FLIP_MODE_AUTO
-	 * From ZED SDK 3.2 a new FLIP_MODE enum was introduced to add the automatic flip mode detection based on the IMU gravity detection. This only works for ZED-M or ZED2 cameras.
-	 */
+	* From ZED SDK 3.2 a new FLIP_MODE enum was introduced to add the automatic flip mode detection based on the IMU gravity detection. This only works for ZED-M or ZED2 cameras.
+	*/
 	enum  SL_FLIP_MODE camera_image_flip;
+
 	/**
 	At initialization, the \ref Camera runs a self-calibration process that corrects small offsets from the device's factory calibration.\n
-	A drawback is that calibration parameters will slightly change from one run to another, which can be an issue for repeatability.\n
-	If set to true, self-calibration will be disabled and calibration parameters won't be optimized.\n
+	A drawback is that calibration parameters will slightly change from one (live) run to another, which can be an issue for repeatability.\n
+	If set to true, self-calibration will be disabled and calibration parameters won't be optimized, raw calibration parameters from the conf file will be used\n
 	default : false
 	\note In most situations, self calibration should remain enabled.
 	\note You can also trigger the self-calibration at anytime after open() by calling \ref Camera::UpdateSelfCalibration(), even if this parameter is set to true.
-
 	 */
 	bool camera_disable_self_calib;
+
 	/**
 	By default, the SDK only computes a single depth map, aligned with the left camera image.\n
 	This parameter allows you to enable the \ref MEASURE "MEASURE_DEPTH_RIGHT" and other \ref MEASURE "MEASURE_<XXX>_RIGHT" at the cost of additional computation time.\n
@@ -848,9 +855,9 @@ struct SL_InitParameters
 	enum SL_DEPTH_MODE depth_mode;
 	/**
 	Regions of the generated depth map can oscillate from one frame to another. These oscillations result from a lack of texture (too homogeneous) on an object and by image noise.
-	\n This parameter enables a stabilization filter that reduces these oscillations.
-	\n default : true
-	\note The stabilization uses the positional tracking to increase its accuracy, so the Positional Tracking module will be enabled automatically when set to true.\n
+	\n This parameter control a stabilization filter that reduces these oscillations. In the range [0-100], 0 is disable (raw depth), smoothness is linear from 1 to 100.
+	\n default : 1
+	\note The stabilization uses the positional tracking to increase its accuracy, so the Positional Tracking module will be enabled automatically when set to a value different from 0.\n
 	 */
 	int depth_stabilization;
 	/**
@@ -964,13 +971,12 @@ struct SL_RuntimeParameters
 	\n Decreasing this value will remove depth data from image areas which are uniform.
 	 */
 	int texture_confidence_threshold;
-
-    /**
-     Defines if the saturated area (Luminance>=255) must be removed from depth map estimation
-     \n True by default
-     \n It is recommended to keep this parameter at true because saturated area can create false detection.
-     */
-    bool remove_saturated_areas;
+	/**
+	 Defines if the saturated area (Luminance>=255) must be removed from depth map estimation
+	 \n True by default
+	 \n It is recommended to keep this parameter at true because saturated area can create false detection.
+	 */
+	bool remove_saturated_areas;
 };
 
 /**
@@ -1351,6 +1357,7 @@ struct SL_StreamingProperties {
 	enum SL_STREAMING_CODEC codec;
 };
 
+
 struct SL_SpatialMappingParameters {
 	/**
 	\brief Spatial mapping resolution in meters. Should fit \ref allowed_resolution (Default is 0.05f).
@@ -1530,6 +1537,12 @@ struct SL_ObjectDetectionRuntimeParameters
 	 * ObjectDetectionRuntimeParameters::detection_confidence_threshold will be taken as fallback/default value
 	 */
 	int object_confidence_threshold[(int)SL_OBJECT_CLASS_LAST];
+	/**
+	\brief Defines the minimum keypoints threshold.
+	 * the SDK will outputs skeletons with more keypoints than this threshold
+	 * it is useful for example to remove unstable fitting results when a skeleton is partially occluded
+	 */
+	int minimum_keypoints_threshold;
 };
 
 /**
@@ -1599,7 +1612,6 @@ struct SL_ObjectData
 	 * \brief 3D object dimensions: width, height, length. Defined in SL_InitParameters_UNIT, expressed in SL_RuntimeParameters::measure3D_reference_frame.
 	 */
 	struct SL_Vector3 dimensions;
-
 	/**
 	 * \brief 3D bounding box of the person represented as eight 3D points
 	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
@@ -1704,7 +1716,7 @@ struct SL_CustomBoxObjectData {
 	\brief Provide hypothesis about the object movements(degrees of freedom) to improve the object tracking
 		* true: means 2 DoF projected alongside the floor plane, the default for object standing on the ground such as person, vehicle, etc
 		* false : 6 DoF full 3D movements are allowed
-    */
+	*/
 	bool is_grounded;
 };
 
@@ -1776,16 +1788,6 @@ struct SL_Rect
 	int height;
 };
 
-struct SL_InputType
-{
-	sl::INPUT_TYPE input_type = sl::INPUT_TYPE::USB;
-	unsigned int serial_number = 0;
-	unsigned int id = 0;
-	const char* svo_path = "";
-	const char*  ip_adress = "";
-	unsigned short port = 0;
-};
-
 #endif
 
 
@@ -1838,7 +1840,9 @@ struct SL_InitMultiCameraParameters
 
 struct SL_InitCameraParameters {
 	float depth_maximum_distance;
-	float object_detection_confidence;
+	float detection_confidence_threshold;
+	CUdevice sdk_gpu_id;
+	int confidence_threshold;
 };
 
 //Not available for the moment.
@@ -1857,6 +1861,12 @@ struct SL_ObjectDetectionFusionParameters
 	 *
 	 */
 	enum SL_BODY_FORMAT body_format;
+
+	/**
+	 * @brief not yet available for this version
+	 *
+	 */
+	char* reid_database_file;
 };
 
 struct SL_ObjectDetectionFusionRuntimeParameters

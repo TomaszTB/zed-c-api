@@ -21,7 +21,6 @@ public:
     static ZEDMultiController* get() {
         if (!instance) // Only allow one instance of class to be generated.
             instance = new ZEDMultiController();
-
         return instance;
     }
 
@@ -32,37 +31,45 @@ public:
 
     }
 
-    static bool isNotCreated(int i) {
+    static bool isNotCreated() {
         return (instance == nullptr);
     }
 
- 
 
-	int open(struct SL_InitMultiCameraParameters *params);
 	void close();
-	int enableObjectDetectionFusion(struct SL_ObjectDetectionFusionParameters* params);
+
+    SL_ERROR_CODE process();
+
+    SL_ERROR_CODE subscribe(struct SL_CameraIdentifier* uuid);
+
+    /////////////////////////////////////////////////////////////////////
+    ///////////////////// Object Detection Fusion ///////////////////////
+    /////////////////////////////////////////////////////////////////////
+
+    ///
+    /// \brief enables Object detection fusion module
+    /// \param [in] parameters defined by \ref sl::ObjectDetectionFusionParameters
+    /// \return
+    ///
+	SL_ERROR_CODE enableObjectDetectionFusion(struct SL_ObjectDetectionFusionParameters* params);
+
 	void disableObjectDetectionFusion();
 	
- 
-	sl::ERROR_CODE addCameraFromID(unsigned int id, struct SL_CameraIdentifier* uuid, struct SL_Vector3* position, struct SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param);
-	sl::ERROR_CODE addCameraFromSN(unsigned int serial_number, struct SL_CameraIdentifier* uuid, struct SL_Vector3* position, struct SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param);
-	sl::ERROR_CODE addCameraFromSVO(const char* path_svo, struct SL_CameraIdentifier* uuid, struct SL_Vector3* position, struct SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param);
-	sl::ERROR_CODE addCameraFromStreaming(const char* ip, unsigned short port, struct SL_CameraIdentifier* uuid, struct SL_Vector3* position, struct SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param);
+    ///
+    /// \brief retrieves a list of objects (in sl::Objects class type) seen by all cameras and merged as if it was seen by a single super-camera.
+    /// \note Internal calls retrieveObjects() for all listed cameras, then merged into a single sl::Objects
+    /// \param [out] objs: list of objects seen by all available cameras
+    /// \note Only the 3d informations is available in the returned object.
+    /// \n For this version, a person is detected if at least it is seen by 2 cameras.
+    ///
+    SL_ERROR_CODE retrieveFusedObjects(struct SL_Objects* objs, struct SL_ObjectDetectionFusionRuntimeParameters* rt);
 
-
-	int grabAll(struct SL_RuntimeMultiCameraParameters* rt_params);
-
-	sl::ERROR_CODE retrieveFusedObjectDetectionData(struct SL_Objects* data, struct SL_ObjectDetectionFusionRuntimeParameters rt);
-
-	sl::ERROR_CODE removeCamera(struct SL_CameraIdentifier* uuid);
 	void destroy();
 
 private:
-	sl::MultiCameraHandler multi_camera;
+	sl::Fusion fusion;
 	sl::ObjectDetectionFusionParameters OD_fusion_init_params;
     static ZEDMultiController* instance;
-
- 
 
 };
 

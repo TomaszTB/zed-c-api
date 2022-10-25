@@ -9,7 +9,6 @@
 ZEDMultiController* ZEDMultiController::instance = nullptr;
 
 ZEDMultiController::ZEDMultiController() {
-   
 }
 
 ZEDMultiController::~ZEDMultiController() {
@@ -17,188 +16,45 @@ ZEDMultiController::~ZEDMultiController() {
 }
 
 void ZEDMultiController::destroy() {
-	multi_camera.close();
-}
-
-
-int ZEDMultiController::open(SL_InitMultiCameraParameters *params)
-{
-	sl::InitMultiCameraParameters init_multi_cam_parameters;
-	init_multi_cam_parameters.max_input_fps = params->max_input_fps;
-	init_multi_cam_parameters.depth_maximum_distance = params->depth_maximum_distance;
-	init_multi_cam_parameters.camera_resolution = (sl::RESOLUTION)params->camera_resolution;
-	init_multi_cam_parameters.depth_mode = (sl::DEPTH_MODE)params->depth_mode;
-	init_multi_cam_parameters.coordinate_system = (sl::COORDINATE_SYSTEM)params->coordinate_system;
-	init_multi_cam_parameters.coordinate_units = (sl::UNIT)params->coordinate_units;
-	return (int)multi_camera.init(init_multi_cam_parameters);
+	fusion.close();
 }
 
 void ZEDMultiController::close() {
-	multi_camera.close();
+	fusion.close();
 }
 
-int ZEDMultiController::enableObjectDetectionFusion(SL_ObjectDetectionFusionParameters* params)
+SL_ERROR_CODE ZEDMultiController::process() {
+
+	return (SL_ERROR_CODE)fusion.process();
+}
+
+SL_ERROR_CODE ZEDMultiController::subscribe(struct SL_CameraIdentifier* uuid) {
+
+	sl::CameraIdentifier sl_uuid;
+	sl_uuid.sn = uuid->sn;
+	return (SL_ERROR_CODE)fusion.subscribe(sl_uuid);
+}
+
+SL_ERROR_CODE ZEDMultiController::enableObjectDetectionFusion(SL_ObjectDetectionFusionParameters* params)
 {
 	OD_fusion_init_params.detection_model = (sl::DETECTION_MODEL) params->detection_model;
 	OD_fusion_init_params.body_format = (sl::BODY_FORMAT)params->body_format;
-	return (int) multi_camera.enableObjectDetectionFusion(OD_fusion_init_params);
+	return (SL_ERROR_CODE)fusion.enableObjectDetectionFusion(OD_fusion_init_params);
 }
 
 void ZEDMultiController::disableObjectDetectionFusion() {
-	multi_camera.disableObjectDetectionFusion();
-}
-
-sl::ERROR_CODE ZEDMultiController::addCameraFromID(unsigned int id, SL_CameraIdentifier* uuid, SL_Vector3* position, SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param)
-{
-	sl::CameraIdentifier uuid_;
-	uuid_.sn = 0;
-	sl::InputType input;
-	input.setFromCameraID(id);
-	sl::Transform pose;
-	pose.setIdentity();
-
-	sl::Translation trans;
-	trans.tx = position->x;
-	trans.ty = position->y;
-	trans.tz = position->z;
-	pose.setTranslation(trans);
-
-	sl::float3 orientation;
-	orientation.x = rotation->x;
-	orientation.y = rotation->y;
-	orientation.z = rotation->z;
-	pose.setRotationVector(orientation);
-
-	sl::InitCameraParameters init_cam_p;
-	init_cam_p.depth_maximum_distance = init_camera_param.depth_maximum_distance;
-	init_cam_p.detection_confidence_threshold = init_camera_param.object_detection_confidence;
-
-	sl::ERROR_CODE err = multi_camera.addCamera(input, uuid_, pose, init_cam_p);
-	uuid->sn = uuid_.sn;
-
-	return err;
-}
-
-sl::ERROR_CODE ZEDMultiController::addCameraFromSN(unsigned int serial_number, SL_CameraIdentifier* uuid, SL_Vector3* position, SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param)
-{
-	sl::CameraIdentifier uuid_;
-	uuid_.sn = 0;
-	sl::InputType input;
-	input.setFromSerialNumber(serial_number);
-	sl::Transform pose;
-	pose.setIdentity();
-
-	sl::Translation trans;
-	trans.tx = position->x;
-	trans.ty = position->y;
-	trans.tz = position->z;
-	pose.setTranslation(trans);
-
-	sl::float3 orientation;
-	orientation.x = rotation->x;
-	orientation.y = rotation->y;
-	orientation.z = rotation->z;
-	pose.setRotationVector(orientation);
-
-	sl::InitCameraParameters init_cam_p;
-	init_cam_p.depth_maximum_distance = init_camera_param.depth_maximum_distance;
-	init_cam_p.detection_confidence_threshold = init_camera_param.object_detection_confidence;
-
-	sl::ERROR_CODE err = multi_camera.addCamera(input, uuid_, pose, init_cam_p);
-	uuid->sn = uuid_.sn;
-
-	return err;
+	fusion.disableObjectDetectionFusion();
 }
 
 
-sl::ERROR_CODE ZEDMultiController::addCameraFromSVO(const char* path_svo, SL_CameraIdentifier* uuid, SL_Vector3* position, SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param)
-{
-	sl::CameraIdentifier uuid_;
-	uuid_.sn = 0;
-	sl::InputType input;
-	input.setFromSVOFile(sl::String(path_svo));
-	sl::Transform pose;
-	pose.setIdentity();
-
-	sl::Translation trans;
-	trans.tx = position->x;
-	trans.ty = position->y;
-	trans.tz = position->z;
-	pose.setTranslation(trans);
-
-	sl::float3 orientation;
-	orientation.x = rotation->x;
-	orientation.y = rotation->y;
-	orientation.z = rotation->z;
-	pose.setRotationVector(orientation);
-
-
-	sl::InitCameraParameters init_cam_p;
-	init_cam_p.depth_maximum_distance = init_camera_param.depth_maximum_distance;
-	init_cam_p.detection_confidence_threshold = init_camera_param.object_detection_confidence;
-
-	sl::ERROR_CODE err = multi_camera.addCamera(input, uuid_, pose, init_cam_p);
-	uuid->sn = uuid_.sn;
-
-	return err;
-}
-
-
-sl::ERROR_CODE ZEDMultiController::addCameraFromStreaming(const char* ip, unsigned short port, SL_CameraIdentifier* uuid, SL_Vector3* position, SL_Vector3* rotation, struct SL_InitCameraParameters init_camera_param)
-{
-	sl::CameraIdentifier uuid_;
-	uuid_.sn = 0;
-	sl::InputType input;
-	input.setFromStream(sl::String(ip), port);
-	sl::Transform pose;
-	pose.setIdentity();
-
-	sl::Translation trans;
-	trans.tx = position->x;
-	trans.ty = position->y;
-	trans.tz = position->z;
-	pose.setTranslation(trans);
-
-	sl::float3 orientation;
-	orientation.x = rotation->x;
-	orientation.y = rotation->y;
-	orientation.z = rotation->z;
-	pose.setRotationVector(orientation);
-
-	sl::InitCameraParameters init_cam_p;
-	init_cam_p.depth_maximum_distance = init_camera_param.depth_maximum_distance;
-	init_cam_p.detection_confidence_threshold = init_camera_param.object_detection_confidence;
-
-	sl::ERROR_CODE err = multi_camera.addCamera(input, uuid_, pose, init_cam_p);
-	uuid->sn = uuid_.sn;
-
-	return err;
-}
-
-
-int ZEDMultiController::grabAll(SL_RuntimeMultiCameraParameters* rt_params)
-{
-	sl::RuntimeMultiCameraParameters rt_m;
-
-	rt_m.force_grab_call = rt_params->force_grab_call;
-	return (int)multi_camera.grabAll(rt_m);
-}
-
-sl::ERROR_CODE ZEDMultiController::removeCamera(SL_CameraIdentifier* uuid)
-{
-	sl::CameraIdentifier uuid_;
-	uuid_.sn = uuid->sn;
-	return multi_camera.removeCamera(uuid_);
-}
- 
-sl::ERROR_CODE ZEDMultiController::retrieveFusedObjectDetectionData(SL_Objects* data, struct SL_ObjectDetectionFusionRuntimeParameters rt) {
+SL_ERROR_CODE ZEDMultiController::retrieveFusedObjects(SL_Objects* data, struct SL_ObjectDetectionFusionRuntimeParameters* rt) {
 	memset(data, 0, sizeof(SL_Objects));
 
 	sl::ObjectDetectionFusionRuntimeParameters od_rt;
-	od_rt.skeleton_minimum_allowed_keypoints = rt.skeleton_minimum_allowed_keypoints;
+	od_rt.skeleton_minimum_allowed_keypoints = rt->skeleton_minimum_allowed_keypoints;
 
 	sl::Objects objects;
-	sl::ERROR_CODE v = multi_camera.retrieveFusedObjects(objects, od_rt);
+	sl::ERROR_CODE v = fusion.retrieveFusedObjects(objects, od_rt);
 	if (v == sl::ERROR_CODE::SUCCESS) {
 		//LOG(verbosity, "retrieve objects :" + std::to_string(objects.object_list.size()));
 		data->is_new = objects.is_new;
@@ -297,6 +153,6 @@ sl::ERROR_CODE ZEDMultiController::retrieveFusedObjectDetectionData(SL_Objects* 
 			}
 		}
 	}
-	return v;
+	return (SL_ERROR_CODE)v;
 
 }
