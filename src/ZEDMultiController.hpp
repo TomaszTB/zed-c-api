@@ -3,7 +3,7 @@
 
 
 #include <sl/Camera.hpp>
-#include <sl/MultiCamera.hpp>
+#include <sl_mc/MultiCamera.hpp>
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -47,12 +47,23 @@ public:
     /////////////////////////////////////////////////////////////////////
 
     ///
+    /// \brief Init multicam parameters
+    /// \param [in] init parameters
+    /// \return
+    ///
+    SL_ERROR_CODE ZEDMultiController::init(struct SL_InitMultiCameraParameters* init_parameters);
+
+    ///
     /// \brief enables Object detection fusion module
     /// \param [in] parameters defined by \ref sl::ObjectDetectionFusionParameters
     /// \return
     ///
 	SL_ERROR_CODE enableObjectDetectionFusion(struct SL_ObjectDetectionFusionParameters* params);
 
+    ///
+    /// \brief disable Object detection fusion module
+    /// \return
+    ///
 	void disableObjectDetectionFusion();
 	
     ///

@@ -23,6 +23,27 @@ void ZEDMultiController::close() {
 	fusion.close();
 }
 
+SL_ERROR_CODE ZEDMultiController::init(struct SL_InitMultiCameraParameters* init_parameters) {
+	sl::InitMultiCameraParameters init_params;
+
+	if (init_parameters->max_input_fps > 0) {
+		init_params.max_input_fps = init_parameters->max_input_fps;
+	}
+
+	init_params.camera_resolution = (sl::RESOLUTION)init_parameters->camera_resolution;
+	init_params.coordinate_system = (sl::COORDINATE_SYSTEM)init_parameters->coordinate_system;
+	init_params.coordinate_units = (sl::UNIT)init_parameters->coordinate_units;
+	init_params.depth_mode = (sl::DEPTH_MODE)init_parameters->depth_mode;
+	init_params.depth_maximum_distance = init_parameters->depth_maximum_distance;
+	init_params.set_multi_cameras_as_static = init_parameters->set_multi_cameras_as_static;
+	init_params.output_performance_metrics = init_parameters->output_performance_metrics;
+
+	sl::ERROR_CODE err = fusion.init(init_params);
+
+	return (SL_ERROR_CODE)err;
+}
+
+
 SL_ERROR_CODE ZEDMultiController::process() {
 
 	return (SL_ERROR_CODE)fusion.process();
@@ -35,7 +56,7 @@ SL_ERROR_CODE ZEDMultiController::subscribe(struct SL_CameraIdentifier* uuid) {
 	return (SL_ERROR_CODE)fusion.subscribe(sl_uuid);
 }
 
-SL_ERROR_CODE ZEDMultiController::enableObjectDetectionFusion(SL_ObjectDetectionFusionParameters* params)
+SL_ERROR_CODE ZEDMultiController::enableObjectDetectionFusion(struct SL_ObjectDetectionFusionParameters* params)
 {
 	OD_fusion_init_params.detection_model = (sl::DETECTION_MODEL) params->detection_model;
 	OD_fusion_init_params.body_format = (sl::BODY_FORMAT)params->body_format;
@@ -47,7 +68,7 @@ void ZEDMultiController::disableObjectDetectionFusion() {
 }
 
 
-SL_ERROR_CODE ZEDMultiController::retrieveFusedObjects(SL_Objects* data, struct SL_ObjectDetectionFusionRuntimeParameters* rt) {
+SL_ERROR_CODE ZEDMultiController::retrieveFusedObjects(struct SL_Objects* data, struct SL_ObjectDetectionFusionRuntimeParameters* rt) {
 	memset(data, 0, sizeof(SL_Objects));
 
 	sl::ObjectDetectionFusionRuntimeParameters od_rt;

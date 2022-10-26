@@ -1836,6 +1836,20 @@ struct SL_InitMultiCameraParameters
 	\n default : \ref COORDINATE_SYSTEM "COORDINATE_SYSTEM::IMAGE"
 	 */
 	enum SL_COORDINATE_SYSTEM coordinate_system;
+
+	/**
+	 * @brief it allows the user to fix the set of cameras added into multi camera API
+	 * if set to true, the multi camera system is considered by the API as static (positionnal tracking will output the same value)
+	 * if set to false, the multi camera system moves rigidly. The API will track the global position of the system
+	 * default : true
+	 */
+	bool set_multi_cameras_as_static;
+
+	/**
+	 * @brief it allows users to extract some stats of the Fusion API like drop frame of each camera, latency, etc
+	 *
+	 */
+	bool output_performance_metrics;
 };
 
 struct SL_InitCameraParameters {

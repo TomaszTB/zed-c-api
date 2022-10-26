@@ -1142,6 +1142,8 @@ extern "C" {
 #ifdef __cplusplus
 extern "C" {
 #endif
+    
+    INTERFACE_API SL_ERROR_CODE slmc_init(struct SL_InitMultiCameraParameters* params);
 
     INTERFACE_API SL_ERROR_CODE slmc_process();
 

@@ -1194,6 +1194,19 @@ extern "C" {
 
 	/*************************** MULTI CAM*************************/
 
+    INTERFACE_API SL_ERROR_CODE slmc_init(struct SL_InitMultiCameraParameters* params)
+    {
+        if (!ZEDMultiController::get()->isNotCreated())
+        {
+            return ZEDMultiController::get()->init(params);
+        }
+        else
+        {
+            return SL_ERROR_CODE_FAILURE;
+        }
+    }
+
+
     INTERFACE_API SL_ERROR_CODE slmc_process()
     {
         if (!ZEDMultiController::get()->isNotCreated()) 
