@@ -216,6 +216,8 @@ SL_InitParameters* ZEDController::getInitParameters() {
 
 	initParams->open_timeout_sec = initParameters.open_timeout_sec;
 
+    initParams->async_grab_camera_recovery = initParameters.async_grab_camera_recovery;
+
     return initParams;
 }
 

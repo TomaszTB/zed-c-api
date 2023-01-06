@@ -3,7 +3,7 @@
 
 
 #include <sl/Camera.hpp>
-#include <sl_mc/MultiCamera.hpp>
+#include <sl/Fusion.hpp>
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -40,7 +40,7 @@ public:
 
     SL_ERROR_CODE process();
 
-    SL_ERROR_CODE subscribe(struct SL_CameraIdentifier* uuid);
+    SL_ERROR_CODE subscribe(struct SL_CameraIdentifier* uuid, char json_config_filename[256]);
 
     /////////////////////////////////////////////////////////////////////
     ///////////////////// Object Detection Fusion ///////////////////////
@@ -51,7 +51,7 @@ public:
     /// \param [in] init parameters
     /// \return
     ///
-    SL_ERROR_CODE ZEDMultiController::init(struct SL_InitMultiCameraParameters* init_parameters);
+    SL_ERROR_CODE init(struct SL_InitFusionParameters* init_parameters);
 
     ///
     /// \brief enables Object detection fusion module
@@ -65,7 +65,7 @@ public:
     /// \return
     ///
 	void disableObjectDetectionFusion();
-	
+
     ///
     /// \brief retrieves a list of objects (in sl::Objects class type) seen by all cameras and merged as if it was seen by a single super-camera.
     /// \note Internal calls retrieveObjects() for all listed cameras, then merged into a single sl::Objects

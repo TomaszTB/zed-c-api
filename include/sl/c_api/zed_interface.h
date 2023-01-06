@@ -1143,11 +1143,11 @@ extern "C" {
 extern "C" {
 #endif
     
-    INTERFACE_API SL_ERROR_CODE slmc_init(struct SL_InitMultiCameraParameters* params);
+    INTERFACE_API SL_ERROR_CODE slmc_init(struct SL_InitFusionParameters* params);
 
     INTERFACE_API SL_ERROR_CODE slmc_process();
 
-    INTERFACE_API SL_ERROR_CODE slmc_subscribe(struct SL_CameraIdentifier* uuid);
+    INTERFACE_API SL_ERROR_CODE slmc_subscribe(struct SL_CameraIdentifier* uuid, char json_config_filename[256]);
 
     /////////////////////////////////////////////////////////////////////
     ///////////////////// Object Detection Fusion ///////////////////////
@@ -1156,7 +1156,7 @@ extern "C" {
     /// \brief enables Object detection fusion module
     /// \param [in] parameters defined by \ref sl::ObjectDetectionFusionParameters
     /// \return
-    INTERFACE_API SL_ERROR_CODE slmc_enable_object_detection_fusion(SL_ObjectDetectionFusionParameters* params);
+    INTERFACE_API SL_ERROR_CODE slmc_enable_object_detection_fusion(struct SL_ObjectDetectionFusionParameters* params);
 
 	/**
 	\brief Disable the object detection module.

@@ -1194,7 +1194,7 @@ extern "C" {
 
 	/*************************** MULTI CAM*************************/
 
-    INTERFACE_API SL_ERROR_CODE slmc_init(struct SL_InitMultiCameraParameters* params)
+    INTERFACE_API SL_ERROR_CODE slmc_init(struct SL_InitFusionParameters* params)
     {
         if (!ZEDMultiController::get()->isNotCreated())
         {
@@ -1219,11 +1219,11 @@ extern "C" {
         }
     }
 
-    INTERFACE_API SL_ERROR_CODE slmc_subscribe(struct SL_CameraIdentifier* uuid) 
+    INTERFACE_API SL_ERROR_CODE slmc_subscribe(struct SL_CameraIdentifier* uuid, char json_config_filename[256])
     {
         if (!ZEDMultiController::get()->isNotCreated())
         {
-            return ZEDMultiController::get()->subscribe(uuid);
+            return ZEDMultiController::get()->subscribe(uuid, json_config_filename);
         }
         else
         {

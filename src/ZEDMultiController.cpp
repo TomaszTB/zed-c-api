@@ -23,20 +23,17 @@ void ZEDMultiController::close() {
 	fusion.close();
 }
 
-SL_ERROR_CODE ZEDMultiController::init(struct SL_InitMultiCameraParameters* init_parameters) {
-	sl::InitMultiCameraParameters init_params;
+SL_ERROR_CODE ZEDMultiController::init(struct SL_InitFusionParameters* init_parameters) {
+	sl::InitFusionParameters init_params;
 
 	if (init_parameters->max_input_fps > 0) {
 		init_params.max_input_fps = init_parameters->max_input_fps;
 	}
 
-	init_params.camera_resolution = (sl::RESOLUTION)init_parameters->camera_resolution;
 	init_params.coordinate_system = (sl::COORDINATE_SYSTEM)init_parameters->coordinate_system;
 	init_params.coordinate_units = (sl::UNIT)init_parameters->coordinate_units;
-	init_params.depth_mode = (sl::DEPTH_MODE)init_parameters->depth_mode;
-	init_params.depth_maximum_distance = init_parameters->depth_maximum_distance;
-	init_params.set_multi_cameras_as_static = init_parameters->set_multi_cameras_as_static;
 	init_params.output_performance_metrics = init_parameters->output_performance_metrics;
+	init_params.enable_svo_mode = init_parameters->enable_svo_mode;
 
 	sl::ERROR_CODE err = fusion.init(init_params);
 
@@ -49,17 +46,19 @@ SL_ERROR_CODE ZEDMultiController::process() {
 	return (SL_ERROR_CODE)fusion.process();
 }
 
-SL_ERROR_CODE ZEDMultiController::subscribe(struct SL_CameraIdentifier* uuid) {
+SL_ERROR_CODE ZEDMultiController::subscribe(struct SL_CameraIdentifier* uuid, char json_config_filename[256]) {
 
 	sl::CameraIdentifier sl_uuid;
 	sl_uuid.sn = uuid->sn;
-	return (SL_ERROR_CODE)fusion.subscribe(sl_uuid);
+	return (SL_ERROR_CODE)fusion.subscribe(sl_uuid, std::string(json_config_filename));
 }
 
 SL_ERROR_CODE ZEDMultiController::enableObjectDetectionFusion(struct SL_ObjectDetectionFusionParameters* params)
 {
 	OD_fusion_init_params.detection_model = (sl::DETECTION_MODEL) params->detection_model;
 	OD_fusion_init_params.body_format = (sl::BODY_FORMAT)params->body_format;
+	OD_fusion_init_params.enable_tracking = params->enable_tracking;
+	OD_fusion_init_params.enable_body_fitting = params->enable_body_fitting;
 	return (SL_ERROR_CODE)fusion.enableObjectDetectionFusion(OD_fusion_init_params);
 }
 
@@ -73,11 +72,12 @@ SL_ERROR_CODE ZEDMultiController::retrieveFusedObjects(struct SL_Objects* data, 
 
 	sl::ObjectDetectionFusionRuntimeParameters od_rt;
 	od_rt.skeleton_minimum_allowed_keypoints = rt->skeleton_minimum_allowed_keypoints;
+	od_rt.skeleton_minimum_allowed_camera = rt->skeleton_minimum_allowed_camera;
+	od_rt.skeleton_smoothing = rt->skeleton_smoothing;
 
 	sl::Objects objects;
 	sl::ERROR_CODE v = fusion.retrieveFusedObjects(objects, od_rt);
 	if (v == sl::ERROR_CODE::SUCCESS) {
-		//LOG(verbosity, "retrieve objects :" + std::to_string(objects.object_list.size()));
 		data->is_new = objects.is_new;
 		data->is_tracked = objects.is_tracked;
 		data->detection_model = (SL_DETECTION_MODEL)OD_fusion_init_params.detection_model;

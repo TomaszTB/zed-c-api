@@ -934,6 +934,14 @@ struct SL_InitParameters
 	\n This parameter only impacts the LIVE mode.
 	 */
 	float open_timeout_sec;
+
+	/**
+	 Define the behavior of the automatic camera recovery during grab() function call. When async is enabled and there's an issue with the communication with the camera
+	 the grab() will exit after a short period and return the ERROR_CODE::CAMERA_REBOOTING warning. The recovery will run in the background until the correct communication is restored.
+	 When async_grab_camera_recovery is false, the grab() function is blocking and will return only once the camera communication is restored or the timeout is reached.
+	 The default behavior is synchronous, like previous ZED SDK versions
+	 */
+	bool async_grab_camera_recovery;
 };
 
 /**
@@ -1154,7 +1162,7 @@ struct SL_PositionalTrackingParameters
 	This mode enables the camera to remember its surroundings. This helps correct positional tracking drift, and can be helpful for positioning
 	different cameras relative to one other in space.
 	\n default: true
-	\warning: This mode requires more resources to run, but greatly improves tracking accuracy. We recommend leaving it on by default.
+d	\warning: This mode requires more resources to run, but greatly improves tracking accuracy. We recommend leaving it on by default.
 		*/
 	bool enable_area_memory;
 	/**
@@ -1796,33 +1804,12 @@ struct SL_Rect
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-struct SL_InitMultiCameraParameters
+struct SL_InitFusionParameters
 {
 	/**
 	the maximum fps of camera data streams. 15 FPS for 2K, etc
 	 */
 	float max_input_fps;
-
-	/**
-	Defines the current maximum distance that can be computed in the defined \ref UNIT.
-	When estimating the depth, the SDK uses this upper limit to turn higher values into \ref TOO_FAR ones.
-	 */
-	float depth_maximum_distance;
-
-	/**
-	Define the chosen camera resolution.\n
-	Available resolutions are listed here: \ref RESOLUTION.
-	\n default : \ref RESOLUTION "RESOLUTION::HD720"
-	 */
-	enum SL_RESOLUTION camera_resolution;
-
-	/**
-	The SDK offers several \ref DEPTH_MODE options offering various levels of performance and accuracy.
-	\n This parameter allows you to set the \ref DEPTH_MODE that best matches your needs.
-	\n default : \ref DEPTH_MODE "DEPTH_MODE::PERFORMANCE"
-	 */
-	enum SL_DEPTH_MODE depth_mode;
-
 	/**
 	This parameter allows you to select the unit to be used for all metric values of the SDK. (depth, point cloud, tracking, mesh, and others).
 	\n default : \ref UNIT "UNIT::MILLIMETER"
@@ -1838,18 +1825,16 @@ struct SL_InitMultiCameraParameters
 	enum SL_COORDINATE_SYSTEM coordinate_system;
 
 	/**
-	 * @brief it allows the user to fix the set of cameras added into multi camera API
-	 * if set to true, the multi camera system is considered by the API as static (positionnal tracking will output the same value)
-	 * if set to false, the multi camera system moves rigidly. The API will track the global position of the system
-	 * default : true
-	 */
-	bool set_multi_cameras_as_static;
-
-	/**
 	 * @brief it allows users to extract some stats of the Fusion API like drop frame of each camera, latency, etc
 	 *
 	 */
 	bool output_performance_metrics;
+
+	/**
+	  * @brief Enable multicam SVO playback. In this mode, the SDK will wait that all SVO started correctly before starting any fusion !
+	  *
+	  */
+	bool enable_svo_mode;
 };
 
 struct SL_InitCameraParameters {
@@ -1857,12 +1842,6 @@ struct SL_InitCameraParameters {
 	float detection_confidence_threshold;
 	CUdevice sdk_gpu_id;
 	int confidence_threshold;
-};
-
-//Not available for the moment.
-struct SL_RuntimeMultiCameraParameters
-{
-	bool force_grab_call;
 };
 
 struct SL_ObjectDetectionFusionParameters
@@ -1880,7 +1859,18 @@ struct SL_ObjectDetectionFusionParameters
 	 * @brief not yet available for this version
 	 *
 	 */
-	char* reid_database_file;
+	//char* reid_database_file;
+
+	/**
+	* \brief Defines if the object detection will track objects across images flow
+	*/
+	bool enable_tracking;
+
+	/**
+	* \brief Defines if the body fitting will be applied
+	*/
+	bool enable_body_fitting;
+
 };
 
 struct SL_ObjectDetectionFusionRuntimeParameters
@@ -1890,6 +1880,18 @@ struct SL_ObjectDetectionFusionRuntimeParameters
 	 *
 	 */
 	int skeleton_minimum_allowed_keypoints;
+	/**
+	 * @brief if a skeleton was detected in less than skeleton_minimum_allowed_camera cameras, it will be discarded
+	 *
+	 */
+	int skeleton_minimum_allowed_camera = -1;
+
+	/**
+	 * @brief this value controls the smoothing of the tracked or fitted fused skeleton.
+	 * it is ranged from 0 (low smoothing) and 1 (high smoothing)
+	 */
+	float skeleton_smoothing = 0.f;
+
 };
 
 struct SL_CameraIdentifier {
