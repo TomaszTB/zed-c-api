@@ -26,14 +26,11 @@ void ZEDMultiController::close() {
 SL_ERROR_CODE ZEDMultiController::init(struct SL_InitFusionParameters* init_parameters) {
 	sl::InitFusionParameters init_params;
 
-	if (init_parameters->max_input_fps > 0) {
-		init_params.max_input_fps = init_parameters->max_input_fps;
-	}
-
 	init_params.coordinate_system = (sl::COORDINATE_SYSTEM)init_parameters->coordinate_system;
 	init_params.coordinate_units = (sl::UNIT)init_parameters->coordinate_units;
 	init_params.output_performance_metrics = init_parameters->output_performance_metrics;
-	init_params.enable_svo_mode = init_parameters->enable_svo_mode;
+	init_params.verbose = init_parameters->verbose;
+	init_params.timeout_period_number = init_parameters->timeout_period_number;
 
 	sl::ERROR_CODE err = fusion.init(init_params);
 

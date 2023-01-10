@@ -215,6 +215,7 @@ struct USB_product {
 \brief Lists error codes in the ZED SDK.
  */
 enum SL_ERROR_CODE {
+	SL_ERROR_CODE_CAMERA_REBOOTING = -1,
 	SL_ERROR_CODE_SUCCESS, /**< Standard code for successful behavior.*/
 	SL_ERROR_CODE_FAILURE, /**< Standard code for unsuccessful behavior.*/
 	SL_ERROR_CODE_NO_GPU_COMPATIBLE, /**< No GPU found or CUDA capability of the device is not supported.*/
@@ -1807,10 +1808,6 @@ struct SL_Rect
 struct SL_InitFusionParameters
 {
 	/**
-	the maximum fps of camera data streams. 15 FPS for 2K, etc
-	 */
-	float max_input_fps;
-	/**
 	This parameter allows you to select the unit to be used for all metric values of the SDK. (depth, point cloud, tracking, mesh, and others).
 	\n default : \ref UNIT "UNIT::MILLIMETER"
 	 */
@@ -1830,11 +1827,14 @@ struct SL_InitFusionParameters
 	 */
 	bool output_performance_metrics;
 
+	bool verbose;
+
 	/**
-	  * @brief Enable multicam SVO playback. In this mode, the SDK will wait that all SVO started correctly before starting any fusion !
-	  *
-	  */
-	bool enable_svo_mode;
+	 * @brief If specified change the number of period necessary for a source to go in timeout without data. For example, if you set this to 5
+	 * then, if any source do not receive data during 5 period, these sources will go to timeout and will be ignored.
+	 *
+	 */
+	unsigned int timeout_period_number;
 };
 
 struct SL_InitCameraParameters {

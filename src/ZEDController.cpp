@@ -80,6 +80,7 @@ int ZEDController::initFromUSB(SL_InitParameters *params, const char* output_fil
     initParams.depth_maximum_distance = params->depth_maximum_distance;
     initParams.optional_opencv_calibration_file = opencv_calib_path;
 	initParams.open_timeout_sec = params->open_timeout_sec;
+    initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
     return open();
 
 }
@@ -117,6 +118,7 @@ int ZEDController::initFromSVO(SL_InitParameters *params, const char* path_svo, 
     initParams.depth_maximum_distance = params->depth_maximum_distance;
     initParams.optional_opencv_calibration_file = opencv_calib_path;
 	initParams.open_timeout_sec = params->open_timeout_sec;
+    initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
     return open();
 }
 
@@ -153,6 +155,7 @@ int ZEDController::initFromStream(SL_InitParameters *params, const char* ip, int
     initParams.depth_maximum_distance = params->depth_maximum_distance;
     initParams.optional_opencv_calibration_file = opencv_calib_path;
 	initParams.open_timeout_sec = params->open_timeout_sec;
+    initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
     return open();
 }
 

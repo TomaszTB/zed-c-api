@@ -649,11 +649,13 @@ extern "C" {
             return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
 
-    INTERFACE_API int sl_get_camera_settings(int c_id, enum SL_VIDEO_SETTINGS mode) {
+    INTERFACE_API SL_ERROR_CODE sl_get_camera_settings(int c_id, enum SL_VIDEO_SETTINGS mode, int* value) {
         if (!ZEDController::get(c_id)->isNull())
-            return ZEDController::get(c_id)->zed.getCameraSettings((sl::VIDEO_SETTINGS)mode);
+        {
+            return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.getCameraSettings((sl::VIDEO_SETTINGS)mode, *value);
+        }
         else
-            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+            return (SL_ERROR_CODE)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
 
     INTERFACE_API int sl_get_roi_for_aec_agc(int c_id, enum SL_SIDE side, struct SL_Rect* roi) {

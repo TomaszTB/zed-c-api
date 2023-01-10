@@ -396,9 +396,10 @@ extern "C" {
     \brief Gets the value of a given setting from the ZED camera.
     \param camera_id : id of the camera instance.
     \param mode : Setting to be retrieved (see \ref SL_VIDEO_SETTINGS).
-    \return The current value for the corresponding setting. Returns -1 if encounters an error.
+    \param value : the requested setting value.
+    \return ERROR_CODE to indicate if the function was successfull.If successfull, setting will be filled with the corresponding value.
      */
-    INTERFACE_API int sl_get_camera_settings(int camera_id, enum SL_VIDEO_SETTINGS mode);
+    INTERFACE_API SL_ERROR_CODE sl_get_camera_settings(int c_id, enum SL_VIDEO_SETTINGS mode, int* value);
 
     /**
     \brief Gets the region of interest for automatic exposure/gain computation
