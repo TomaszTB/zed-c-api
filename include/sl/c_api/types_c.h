@@ -5,6 +5,7 @@
  * @file
  * */
 
+#define MAX_FUSED_CAMERAS 20
 #define WITH_OBJECT_DETECTION 1
 #ifdef WITH_UNLIMITED_CAMERA
 #define MAX_CAMERA_PLUGIN 20
@@ -15,6 +16,8 @@
 #define MAX_SUBMESH 1000
 
 #include <stdbool.h>
+
+#include "cuda.h"
 
  /**
  * \brief Quaternion
@@ -190,7 +193,7 @@ struct SL_TemperatureData {
 /**
 * \brief Sensor Data structure
 */
-struct SL_SensorData {
+struct SL_SensorsData {
 	//IMU data
 	struct SL_IMUData imu;
 	struct SL_BarometerData barometer;
@@ -259,8 +262,11 @@ enum SL_ERROR_CODE {
 enum SL_RESOLUTION {
 	SL_RESOLUTION_HD2K, /**< 2208*1242, available framerates: 15 fps.*/
 	SL_RESOLUTION_HD1080, /**< 1920*1080, available framerates: 15, 30 fps.*/
+	SL_RESOLUTION_HD1200, /**< 1920*1200 (x2), available framerates: 30,60 fps. (ZED-X(M) only)*/
 	SL_RESOLUTION_HD720, /**< 1280*720, available framerates: 15, 30, 60 fps.*/
-	SL_RESOLUTION_VGA /**< 672*376, available framerates: 15, 30, 60, 100 fps.*/
+	SL_RESOLUTION_SVGA, /**< 960*600 (x2), available framerates: 60, 120 fps. (ZED-X(M) only) */
+	SL_RESOLUTION_VGA, /**< 672*376, available framerates: 15, 30, 60, 100 fps.*/
+	SL_RESOLUTION_AUTO, /**< Select the resolution compatible with camera, on ZEDX HD1200, HD720 otherwise */
 };
 
 /**
@@ -304,6 +310,8 @@ enum SL_MODEL {
 	SL_MODEL_ZED_M, /**<  Defines ZED Mini (ZED-M) Camera model */
 	SL_MODEL_ZED2, /**< Defines ZED 2 Camera model */
 	SL_MODEL_ZED2i, /**< Defines ZED 2i Camera model */
+	SL_MODEL_ZED_X,
+	SL_MODEL_ZED_XM
 };
 
 /**
@@ -346,7 +354,8 @@ enum SL_SIDE {
 enum SL_INPUT_TYPE {
 	SL_INPUT_TYPE_USB,
 	SL_INPUT_TYPE_SVO,
-	SL_INPUT_TYPE_STREAM
+	SL_INPUT_TYPE_STREAM,
+	SL_INPUT_TYPE_GMSL
 };
 
 /**
@@ -392,6 +401,14 @@ enum SL_VIDEO_SETTINGS {
 	SL_VIDEO_SETTINGS_WHITEBALANCE_TEMPERATURE, /**< Defines the color temperature value. Setting a value will automatically set @WHITEBALANCE_AUTO to 0. Affected value should be between 2800 and 6500 with a step of 100.*/
 	SL_VIDEO_SETTINGS_WHITEBALANCE_AUTO, /**< Defines if the White balance is in automatic mode or not*/
 	SL_VIDEO_SETTINGS_LED_STATUS, /**< Defines the status of the camera front LED. Set to 0 to disable the light, 1 to enable the light. Default value is on. Requires Camera FW 1523 at least.*/
+	SL_VIDEO_SETTINGS_EXPOSURE_TIME,/**< Defines the real exposure time in microseconds. Only available for GMSL based cameras. Recommended for ZED-X/ZED-XM to control manual exposure (instead of EXPOSURE setting)*/
+	SL_VIDEO_SETTINGS_ANALOG_GAIN,/**< Defines the real analog gain (sensor) in mDB. Range is defined by Jetson DTS and by default [1000-16000].  Recommended for ZED-X/ZED-XM to control manual sensor gain (instead of GAIN setting). Only available for GMSL based cameras.*/
+	SL_VIDEO_SETTINGS_DIGITAL_GAIN,/**< Defines the real digital gain (ISP) as a factor. Range is defined by Jetson DTS and by default [1-256].  Recommended for ZED-X/ZED-XM to control manual ISP gain (instead of GAIN setting). Only available for GMSL based cameras.*/
+	SL_VIDEO_SETTINGS_AUTO_EXPOSURE_TIME_RANGE,/**< Defines the range of exposure auto control in micro seconds.Used with \ref setCameraSettings(VIDEO_SETTINGS,int,int).  Min/Max range between Max range defined in DTS. By default : [28000 - <fps_time> or 19000] us. Only available for GMSL based cameras.*/
+	SL_VIDEO_SETTINGS_AUTO_ANALOG_GAIN_RANGE, /**< Defines the range of sensor gain in automatic control. Used in setCameraSettings(VIDEO_SETTINGS,int,int). Min/Max range between [1000 - 16000]mdB  */
+	SL_VIDEO_SETTINGS_AUTO_DIGITAL_GAIN_RANGE, /**< Defines the range of digital ISP gain in automatic control. Used in setCameraSettings(VIDEO_SETTINGS,int,int) */
+	SL_VIDEO_SETTINGS_EXPOSURE_COMPENSATION, /**< Exposure target compensation made after AE. Reduces the overall illumination by factor of F-stops. values range is [0 - 100] (mapped between [-2.0,2.0]).  Only available for GMSL based cameras*/
+	SL_VIDEO_SETTINGS_DENOISING, /**< Defines the level of denoising applied on both left and right images. values range is [0-100].Default value is 50. Only available for GMSL based cameras*/
 	SL_VIDEO_SETTINGS_LAST
 };
 
@@ -515,24 +532,13 @@ enum SL_MESH_FILE_FORMAT {
 };
 
 /**
-\brief Lists available depth sensing modes.
- */
-enum SL_SENSING_MODE {
-	/** This mode outputs ZED standard depth map that preserves edges and depth accuracy.
-	* Applications example: Obstacle detection, Automated navigation, People detection, 3D reconstruction, measurements.*/
-	SL_SENSING_MODE_STANDARD,
-	/** This mode outputs a smooth and fully dense depth map.
-	* Applications example: AR/VR, Mixed-reality capture, Image post-processing.*/
-	SL_SENSING_MODE_FILL
-};
-
-/**
 \brief Lists available depth computation modes.
  */
 enum SL_DEPTH_MODE {
 	SL_DEPTH_MODE_NONE, /** This mode does not compute any depth map. Only rectified stereo images will be available.*/
 	SL_DEPTH_MODE_PERFORMANCE, /** Computation mode optimized for speed.*/
-	SL_DEPTH_MODE_QUALITY, /** Computation mode designed for challenging areas with untextured surfaces.*/
+	SL_DEPTH_MODE_QUALITY, /**< Computation mode designed for challenging areas with untextured surfaces.*/
+	//SL_DEPTH_MODE_NEURAL_FAST, /**< End to End Neural disparity estimation, requires AI module */
 	SL_DEPTH_MODE_ULTRA, /** Computation mode favorising edges and sharpness. Requires more GPU memory and computation power.*/
 	SL_DEPTH_MODE_NEURAL /**< End to End Neural disparity estimation, requires AI module */
 };
@@ -630,16 +636,20 @@ enum SL_OBJECT_ACTION_STATE
 /**
 \brief List available models for detection
  */
-enum SL_DETECTION_MODEL {
-	SL_DETECTION_MODEL_MULTI_CLASS_BOX, /**< Any objects, bounding box based */
-	SL_DETECTION_MODEL_MULTI_CLASS_BOX_ACCURATE, /**< Any objects, bounding box based, more accurate but slower than the base model */
-	SL_DETECTION_MODEL_HUMAN_BODY_FAST, /**<  Keypoints based, specific to human skeleton, real time performance even on Jetson or low end GPU cards */
-	SL_DETECTION_MODEL_HUMAN_BODY_ACCURATE, /**<  Keypoints based, specific to human skeleton, state of the art accuracy, requires powerful GPU */
-	SL_DETECTION_MODEL_MULTI_CLASS_BOX_MEDIUM, /**< Any objects, bounding box based, compromise between accuracy and speed */
-	SL_DETECTION_MODEL_HUMAN_BODY_MEDIUM, /**<  Keypoints based, specific to human skeleton, compromise between accuracy and speed */
-	SL_DETECTION_MODEL_PERSON_HEAD_BOX, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environement, the person localization is also improved */
-	SL_DETECTION_MODEL_PERSON_HEAD_BOX_ACCURATE, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environments, the person localization is also improved, state of the art accuracy */
-	SL_DETECTION_MODEL_CUSTOM_BOX_OBJECTS /**< For external inference, using your own custom model and/or frameworks. This mode disable the internal inference engine, the 2D bounding box detection must be provided */
+enum SL_OBJECT_DETECTION_MODEL {
+	SL_OBJECT_DETECTION_MODEL_MULTI_CLASS_BOX_FAST, /**< Any objects, bounding box based */
+	SL_OBJECT_DETECTION_MODEL_MULTI_CLASS_BOX_MEDIUM, /**< Any objects, bounding box based, compromise between accuracy and speed */
+	SL_OBJECT_DETECTION_MODEL_MULTI_CLASS_BOX_ACCURATE, /**< Any objects, bounding box based, more accurate but slower than the base model */
+	SL_OBJECT_DETECTION_MODEL_PERSON_HEAD_BOX_FAST, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environement, the person localization is also improved */
+	SL_OBJECT_DETECTION_MODEL_PERSON_HEAD_BOX_ACCURATE, /**<  Bounding Box detector specialized in person heads, particulary well suited for crowded environments, the person localization is also improved, state of the art accuracy */
+	SL_OBJECT_DETECTION_MODEL_CUSTOM_BOX_OBJECTS, /**< For external inference, using your own custom model and/or frameworks. This mode disable the internal inference engine, the 2D bounding box detection must be provided */
+};
+
+enum SL_BODY_TRACKING_MODEL
+{
+	SL_BODY_TRACKING_MODEL_HUMAN_BODY_FAST, /**<  Keypoints based, specific to human skeleton, real time performance even on Jetson or low end GPU cards */
+	SL_BODY_TRACKING_MODEL_HUMAN_BODY_MEDIUM, /**<  Keypoints based, specific to human skeleton, compromise between accuracy and speed */
+	SL_BODY_TRACKING_MODEL_HUMAN_BODY_ACCURATE, /**<  Keypoints based, specific to human skeleton, state of the art accuracy, requires powerful GPU */
 };
 
 /**
@@ -652,6 +662,12 @@ enum SL_AI_MODELS {
 	SL_AI_MODELS_HUMAN_BODY_FAST_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
 	SL_AI_MODELS_HUMAN_BODY_MEDIUM_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_MEDIUM
 	SL_AI_MODELS_HUMAN_BODY_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_ACCURATE
+	SL_AI_MODELS_HUMAN_BODY_38_FAST_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
+	SL_AI_MODELS_HUMAN_BODY_38_MEDIUM_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
+	SL_AI_MODELS_HUMAN_BODY_38_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
+	SL_AI_MODELS_HUMAN_BODY_70_FAST_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
+	SL_AI_MODELS_HUMAN_BODY_70_MEDIUM_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
+	SL_AI_MODELS_HUMAN_BODY_70_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
 	SL_AI_MODELS_PERSON_HEAD_DETECTION, // related to sl::DETECTION_MODEL::PERSON_HEAD_BOX
 	SL_AI_MODELS_PERSON_HEAD_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::PERSON_HEAD_BOX_ACCURATE
 	SL_AI_MODELS_REID_ASSOCIATION, // related to sl::BatchParameters::enable
@@ -684,87 +700,253 @@ enum SL_OBJECT_FILTERING_MODE {
 enum SL_BODY_FORMAT
 {
 	/**
-	 * \brief 18  keypoint model of COCO 18.
-	 * \note local keypoint angle and position are not available with this format
+	 * \brief Legacy 38 keypoint model.
+	 * Body model, including feet simplified face and hands
 	 */
-	SL_BODY_FORMAT_POSE_18,
+	SL_BODY_FORMAT_BODY_18,
+	/**
+	* \brief Legacy 34 keypoints model.
+	* Body model, requires body fitting enabled
+	 */
+	SL_BODY_FORMAT_BODY_34,
+	/**
+	 * \brief 38 keypoint model.
+	 * Body model, including feet simplified face and hands
+	 */
+	SL_BODY_FORMAT_BODY_38,
 
 	/**
-	 * \brief 34 keypoint model.
-	 * \note local keypoint angle and position are available
-	 * \warning The SDK will automatically enable fitting.
+	 * \brief 70 keypoint model.
+	 * Body model, including feet and full hands models (and simplified face)
 	 */
-	 SL_BODY_FORMAT_POSE_34,
+	 SL_BODY_FORMAT_BODY_70,
+};
+
+enum SL_BODY_KEYPOINTS_SELECTION
+{
+	/**
+	 * \brief Full keypoint model.
+	 */
+	SL_BODY_KEYPOINTS_SELECTION_FULL,
+	/**
+	 * \brief Upper body keypoint model.
+	 * Only the upper body will be outputted (from hip)
+	 */
+	SL_BODY_KEYPOINTS_SELECTION_UPPER_BODY,
+	/**
+	 * \brief Hands only
+	 */
+	//SL_BODY_KEYPOINTS_SELECTION_HAND
+};
+
+
+/**
+ * \brief semantic of human body parts and order of \ref ObjectData::keypoint for BODY_FORMAT::BODY_18.
+ */
+enum SL_BODY_18_PARTS
+{
+	SL_BODY_18_PARTS_NOSE,
+	SL_BODY_18_PARTS_NECK,
+	SL_BODY_18_PARTS_RIGHT_SHOULDER,
+	SL_BODY_18_PARTS_RIGHT_ELBOW,
+	SL_BODY_18_PARTS_RIGHT_WRIST,
+	SL_BODY_18_PARTS_LEFT_SHOULDER,
+	SL_BODY_18_PARTS_LEFT_ELBOW,
+	SL_BODY_18_PARTS_LEFT_WRIST,
+	SL_BODY_18_PARTS_RIGHT_HIP,
+	SL_BODY_18_PARTS_RIGHT_KNEE,
+	SL_BODY_18_PARTS_RIGHT_ANKLE,
+	SL_BODY_18_PARTS_LEFT_HIP,
+	SL_BODY_18_PARTS_LEFT_KNEE,
+	SL_BODY_18_PARTS_LEFT_ANKLE,
+	SL_BODY_18_PARTS_RIGHT_EYE,
+	SL_BODY_18_PARTS_LEFT_EYE,
+	SL_BODY_18_PARTS_RIGHT_EAR,
+	SL_BODY_18_PARTS_LEFT_EAR,
+	SL_BODY_18_PARTS_LAST
 };
 
 /**
- * \brief semantic of human body parts and order of \ref ObjectData::keypoint.
+ * \brief semantic of human body parts and order of \ref ObjectData::keypoint for BODY_FORMAT::BODY_34.
  */
-enum SL_BODY_PARTS_POSE_18
+enum SL_BODY_34_PARTS
 {
-	SL_BODY_PARTS_POSE_18_NOSE,
-	SL_BODY_PARTS_POSE_18_NECK,
-	SL_BODY_PARTS_POSE_18_RIGHT_SHOULDER,
-	SL_BODY_PARTS_POSE_18_RIGHT_ELBOW,
-	SL_BODY_PARTS_POSE_18_RIGHT_WRIST,
-	SL_BODY_PARTS_POSE_18_LEFT_SHOULDER,
-	SL_BODY_PARTS_POSE_18_LEFT_ELBOW,
-	SL_BODY_PARTS_POSE_18_LEFT_WRIST,
-	SL_BODY_PARTS_POSE_18_RIGHT_HIP,
-	SL_BODY_PARTS_POSE_18_RIGHT_KNEE,
-	SL_BODY_PARTS_POSE_18_RIGHT_ANKLE,
-	SL_BODY_PARTS_POSE_18_LEFT_HIP,
-	SL_BODY_PARTS_POSE_18_LEFT_KNEE,
-	SL_BODY_PARTS_POSE_18_LEFT_ANKLE,
-	SL_BODY_PARTS_POSE_18_RIGHT_EYE,
-	SL_BODY_PARTS_POSE_18_LEFT_EYE,
-	SL_BODY_PARTS_POSE_18_RIGHT_EAR,
-	SL_BODY_PARTS_POSE_18_LEFT_EAR,
-	SL_BODY_PARTS_POSE_18_LAST
+	SL_BODY_34_PARTS_PELVIS,
+	SL_BODY_34_PARTS_NAVAL_SPINE,
+	SL_BODY_34_PARTS_CHEST_SPINE,
+	SL_BODY_34_PARTS_NECK,
+	SL_BODY_34_PARTS_LEFT_CLAVICLE,
+	SL_BODY_34_PARTS_LEFT_SHOULDER,
+	SL_BODY_34_PARTS_LEFT_ELBOW,
+	SL_BODY_34_PARTS_LEFT_WRIST,
+	SL_BODY_34_PARTS_LEFT_HAND,
+	SL_BODY_34_PARTS_LEFT_HANDTIP,
+	SL_BODY_34_PARTS_LEFT_THUMB,
+	SL_BODY_34_PARTS_RIGHT_CLAVICLE,
+	SL_BODY_34_PARTS_RIGHT_SHOULDER,
+	SL_BODY_34_PARTS_RIGHT_ELBOW,
+	SL_BODY_34_PARTS_RIGHT_WRIST,
+	SL_BODY_34_PARTS_RIGHT_HAND,
+	SL_BODY_34_PARTS_RIGHT_HANDTIP,
+	SL_BODY_34_PARTS_RIGHT_THUMB,
+	SL_BODY_34_PARTS_LEFT_HIP,
+	SL_BODY_34_PARTS_LEFT_KNEE,
+	SL_BODY_34_PARTS_LEFT_ANKLE,
+	SL_BODY_34_PARTS_LEFT_FOOT,
+	SL_BODY_34_PARTS_RIGHT_HIP,
+	SL_BODY_34_PARTS_RIGHT_KNEE,
+	SL_BODY_34_PARTS_RIGHT_ANKLE,
+	SL_BODY_34_PARTS_RIGHT_FOOT,
+	SL_BODY_34_PARTS_HEAD,
+	SL_BODY_34_PARTS_NOSE,
+	SL_BODY_34_PARTS_LEFT_EYE,
+	SL_BODY_34_PARTS_LEFT_EAR,
+	SL_BODY_34_PARTS_RIGHT_EYE,
+	SL_BODY_34_PARTS_RIGHT_EAR,
+	SL_BODY_34_PARTS_LEFT_HEEL,
+	SL_BODY_34_PARTS_RIGHT_HEEL,
+	SL_BODY_34_PARTS_LAST
+};
+
+
+/**
+ * \brief semantic of human body parts and order of \ref ObjectData::keypoint for BODY_FORMAT::BODY_38.
+ */
+enum SL_BODY_38_PARTS
+{
+	SL_BODY_38_PARTS_PELVIS,
+	SL_BODY_38_PARTS_SPINE_1,
+	SL_BODY_38_PARTS_SPINE_2,
+	SL_BODY_38_PARTS_SPINE_3,
+	SL_BODY_38_PARTS_NECK,
+	SL_BODY_38_PARTS_NOSE,
+	SL_BODY_38_PARTS_LEFT_EYE,
+	SL_BODY_38_PARTS_RIGHT_EYE,
+	SL_BODY_38_PARTS_LEFT_EAR,
+	SL_BODY_38_PARTS_RIGHT_EAR,
+	SL_BODY_38_PARTS_LEFT_CLAVICLE,
+	SL_BODY_38_PARTS_RIGHT_CLAVICLE,
+	SL_BODY_38_PARTS_LEFT_SHOULDER,
+	SL_BODY_38_PARTS_RIGHT_SHOULDER,
+	SL_BODY_38_PARTS_LEFT_ELBOW,
+	SL_BODY_38_PARTS_RIGHT_ELBOW,
+	SL_BODY_38_PARTS_LEFT_WRIST,
+	SL_BODY_38_PARTS_RIGHT_WRIST,
+	SL_BODY_38_PARTS_LEFT_HIP,
+	SL_BODY_38_PARTS_RIGHT_HIP,
+	SL_BODY_38_PARTS_LEFT_KNEE,
+	SL_BODY_38_PARTS_RIGHT_KNEE,
+	SL_BODY_38_PARTS_LEFT_ANKLE,
+	SL_BODY_38_PARTS_RIGHT_ANKLE,
+	SL_BODY_38_PARTS_LEFT_BIG_TOE,
+	SL_BODY_38_PARTS_RIGHT_BIG_TOE,
+	SL_BODY_38_PARTS_LEFT_SMALL_TOE,
+	SL_BODY_38_PARTS_RIGHT_SMALL_TOE,
+	SL_BODY_38_PARTS_LEFT_HEEL,
+	SL_BODY_38_PARTS_RIGHT_HEEL,
+	// Hands
+	SL_BODY_38_PARTS_LEFT_HAND_THUMB_4,
+	SL_BODY_38_PARTS_RIGHT_HAND_THUMB_4,
+	SL_BODY_38_PARTS_LEFT_HAND_INDEX_1,
+	SL_BODY_38_PARTS_RIGHT_HAND_INDEX_1,
+	SL_BODY_38_PARTS_LEFT_HAND_MIDDLE_4,
+	SL_BODY_38_PARTS_RIGHT_HAND_MIDDLE_4,
+	SL_BODY_38_PARTS_LEFT_HAND_PINKY_1,
+	SL_BODY_38_PARTS_RIGHT_HAND_PINKY_1,
+	SL_BODY_38_PARTS_LAST
 };
 
 /**
- * \brief semantic of human body parts and order of \ref ObjectData::keypoint for BODY_FORMAT::POSE_34.
+ * \brief semantic of human body parts and order of \ref ObjectData::keypoint for BODY_FORMAT::BODY_70.
  */
-enum SL_BODY_PARTS_POSE_34
+enum SL_BODY_70_PARTS
 {
-	SL_BODY_PARTS_POSE_34_PELVIS,
-	SL_BODY_PARTS_POSE_34_NAVAL_SPINE,
-	SL_BODY_PARTS_POSE_34_CHEST_SPINE,
-	SL_BODY_PARTS_POSE_34_NECK,
-	SL_BODY_PARTS_POSE_34_LEFT_CLAVICLE,
-	SL_BODY_PARTS_POSE_34_LEFT_SHOULDER,
-	SL_BODY_PARTS_POSE_34_LEFT_ELBOW,
-	SL_BODY_PARTS_POSE_34_LEFT_WRIST,
-	SL_BODY_PARTS_POSE_34_LEFT_HAND,
-	SL_BODY_PARTS_POSE_34_LEFT_HANDTIP,
-	SL_BODY_PARTS_POSE_34_LEFT_THUMB,
-	SL_BODY_PARTS_POSE_34_RIGHT_CLAVICLE,
-	SL_BODY_PARTS_POSE_34_RIGHT_SHOULDER,
-	SL_BODY_PARTS_POSE_34_RIGHT_ELBO,
-	SL_BODY_PARTS_POSE_34_RIGHT_WRIST,
-	SL_BODY_PARTS_POSE_34_RIGHT_HAND,
-	SL_BODY_PARTS_POSE_34_RIGHT_HANDTIP,
-	SL_BODY_PARTS_POSE_34_RIGHT_THUMB,
-	SL_BODY_PARTS_POSE_34_LEFT_HIP,
-	SL_BODY_PARTS_POSE_34_LEFT_KNEE,
-	SL_BODY_PARTS_POSE_34_LEFT_ANKLE,
-	SL_BODY_PARTS_POSE_34_LEFT_FOOT,
-	SL_BODY_PARTS_POSE_34_RIGHT_HIP,
-	SL_BODY_PARTS_POSE_34_RIGHT_KNEE,
-	SL_BODY_PARTS_POSE_34_RIGHT_ANKLE,
-	SL_BODY_PARTS_POSE_34_RIGHT_FOOT,
-	SL_BODY_PARTS_POSE_34_HEAD,
-	SL_BODY_PARTS_POSE_34_NOSE,
-	SL_BODY_PARTS_POSE_34_LEFT_EYE,
-	SL_BODY_PARTS_POSE_34_LEFT_EAR,
-	SL_BODY_PARTS_POSE_34_RIGHT_EYE,
-	SL_BODY_PARTS_POSE_34_RIGHT_EAR,
-	SL_BODY_PARTS_POSE_34_LEFT_HEEL,
-	SL_BODY_PARTS_POSE_34_RIGHT_HEEL,
-	SL_BODY_PARTS_POSE_34_LAST
+	SL_BODY_70_PARTS_PELVIS,
+	SL_BODY_70_PARTS_SPINE_1,
+	SL_BODY_70_PARTS_SPINE_2,
+	SL_BODY_70_PARTS_SPINE_3,
+	SL_BODY_70_PARTS_NECK,
+	SL_BODY_70_PARTS_NOSE,
+	SL_BODY_70_PARTS_LEFT_EYE,
+	SL_BODY_70_PARTS_RIGHT_EYE,
+	SL_BODY_70_PARTS_LEFT_EAR,
+	SL_BODY_70_PARTS_RIGHT_EAR,
+	SL_BODY_70_PARTS_LEFT_CLAVICLE,
+	SL_BODY_70_PARTS_RIGHT_CLAVICLE,
+	SL_BODY_70_PARTS_LEFT_SHOULDER,
+	SL_BODY_70_PARTS_RIGHT_SHOULDER,
+	SL_BODY_70_PARTS_LEFT_ELBOW,
+	SL_BODY_70_PARTS_RIGHT_ELBOW,
+	SL_BODY_70_PARTS_LEFT_WRIST,
+	SL_BODY_70_PARTS_RIGHT_WRIST,
+	SL_BODY_70_PARTS_LEFT_HIP,
+	SL_BODY_70_PARTS_RIGHT_HIP,
+	SL_BODY_70_PARTS_LEFT_KNEE,
+	SL_BODY_70_PARTS_RIGHT_KNEE,
+	SL_BODY_70_PARTS_LEFT_ANKLE,
+	SL_BODY_70_PARTS_RIGHT_ANKLE,
+	SL_BODY_70_PARTS_LEFT_BIG_TOE,
+	SL_BODY_70_PARTS_RIGHT_BIG_TOE,
+	SL_BODY_70_PARTS_LEFT_SMALL_TOE,
+	SL_BODY_70_PARTS_RIGHT_SMALL_TOE,
+	SL_BODY_70_PARTS_LEFT_HEEL,
+	SL_BODY_70_PARTS_RIGHT_HEEL,
+	// Hands
+	// Left
+	SL_BODY_70_PARTS_LEFT_HAND_THUMB_1,
+	SL_BODY_70_PARTS_LEFT_HAND_THUMB_2,
+	SL_BODY_70_PARTS_LEFT_HAND_THUMB_3,
+	SL_BODY_70_PARTS_LEFT_HAND_THUMB_4,
+	SL_BODY_70_PARTS_LEFT_HAND_INDEX_1,
+	SL_BODY_70_PARTS_LEFT_HAND_INDEX_2,
+	SL_BODY_70_PARTS_LEFT_HAND_INDEX_3,
+	SL_BODY_70_PARTS_LEFT_HAND_INDEX_4,
+	SL_BODY_70_PARTS_LEFT_HAND_MIDDLE_1,
+	SL_BODY_70_PARTS_LEFT_HAND_MIDDLE_2,
+	SL_BODY_70_PARTS_LEFT_HAND_MIDDLE_3,
+	SL_BODY_70_PARTS_LEFT_HAND_MIDDLE_4,
+	SL_BODY_70_PARTS_LEFT_HAND_RING_1,
+	SL_BODY_70_PARTS_LEFT_HAND_RING_2,
+	SL_BODY_70_PARTS_LEFT_HAND_RING_3,
+	SL_BODY_70_PARTS_LEFT_HAND_RING_4,
+	SL_BODY_70_PARTS_LEFT_HAND_PINKY_1,
+	SL_BODY_70_PARTS_LEFT_HAND_PINKY_2,
+	SL_BODY_70_PARTS_LEFT_HAND_PINKY_3,
+	SL_BODY_70_PARTS_LEFT_HAND_PINKY_4,
+	//Right
+	SL_BODY_70_PARTS_RIGHT_HAND_THUMB_1,
+	SL_BODY_70_PARTS_RIGHT_HAND_THUMB_2,
+	SL_BODY_70_PARTS_RIGHT_HAND_THUMB_3,
+	SL_BODY_70_PARTS_RIGHT_HAND_THUMB_4,
+	SL_BODY_70_PARTS_RIGHT_HAND_INDEX_1,
+	SL_BODY_70_PARTS_RIGHT_HAND_INDEX_2,
+	SL_BODY_70_PARTS_RIGHT_HAND_INDEX_3,
+	SL_BODY_70_PARTS_RIGHT_HAND_INDEX_4,
+	SL_BODY_70_PARTS_RIGHT_HAND_MIDDLE_1,
+	SL_BODY_70_PARTS_RIGHT_HAND_MIDDLE_2,
+	SL_BODY_70_PARTS_RIGHT_HAND_MIDDLE_3,
+	SL_BODY_70_PARTS_RIGHT_HAND_MIDDLE_4,
+	SL_BODY_70_PARTS_RIGHT_HAND_RING_1,
+	SL_BODY_70_PARTS_RIGHT_HAND_RING_2,
+	SL_BODY_70_PARTS_RIGHT_HAND_RING_3,
+	SL_BODY_70_PARTS_RIGHT_HAND_RING_4,
+	SL_BODY_70_PARTS_RIGHT_HAND_PINKY_1,
+	SL_BODY_70_PARTS_RIGHT_HAND_PINKY_2,
+	SL_BODY_70_PARTS_RIGHT_HAND_PINKY_3,
+	SL_BODY_70_PARTS_RIGHT_HAND_PINKY_4,
+	SL_BODY_70_PARTS_LAST
 };
 
+/**
+\brief Change the type of outputed position for the Fusion positional tracking (raw data or fusion data projected into zed camera)
+*/
+enum SL_POSITION_TYPE {
+	RAW = 0, /*The output position will be the raw position data*/
+	FUSION, /*The output position will be the fused position projected into the requested camera repository*/
+	///@cond SHOWHIDDEN 
+	LAST
+	///@endcond
+};
 
 /**
 * \brief Resolution
@@ -951,21 +1133,23 @@ Parameters that define the behavior of the grab.
 struct SL_RuntimeParameters
 {
 	/**
-	Defines the algorithm used for depth map computation, more info : \ref SENSING_MODE definition.
-	\n default : \ref SENSING_MODE_STANDARD
-	*/
-	enum SL_SENSING_MODE sensing_mode;
-	/**
 	Provides 3D measures (point cloud and normals) in the desired reference frame (default is REFERENCE_FRAME_CAMERA)
 	\n default : \ref REFERENCE_FRAME_CAMERA
 	 */
-	enum  SL_REFERENCE_FRAME reference_frame;
+	enum SL_REFERENCE_FRAME reference_frame;
 	/**
 	Defines if the depth map should be computed.
 	\n If false, only the images are available.
 	\n default : true
 	 */
 	bool enable_depth;
+        
+        /**
+        Defines if the depth map should be completed or not, similar to the removed SENSING_MODE::FILL
+        \warning Enabling this will override the confidence values confidence_threshold and texture_confidence_threshold as well as remove_saturated_areas
+         */
+	bool enable_fill_mode;
+        
 	/**
 	Threshold to reject depth values based on their confidence.
 	\n Each depth pixel has a corresponding confidence. (\ref MEASURE "MEASURE_CONFIDENCE"), the confidence range is [1,100].
@@ -1009,6 +1193,10 @@ struct SL_DeviceProperties {
 	\n Not provided for Windows
 	 */
 	unsigned int sn;
+	/**
+	 camera input type
+	 */
+	enum SL_INPUT_TYPE input_type;
 };
 
 struct SL_CameraParameters {
@@ -1450,6 +1638,11 @@ Sets the object detection parameters.
 struct SL_ObjectDetectionParameters
 {
 	/**
+	\brief Defines a module instance id. This is used to identify which object detection model instance is used.
+	 * If the id is negative it will be auto incremented/generated
+	 */
+	unsigned int instance_module_id;
+	/**
 	\brief Defines if the object detection is synchronized to the image or runs in a separate thread.
 	If set to true, the detection is run for every grab, otherwise, the thread runs at its own speed, which can lead to new detection once in a while.
 	*/
@@ -1461,20 +1654,11 @@ struct SL_ObjectDetectionParameters
 	/**
 	\brief Defines if the mask object will be computed
 	 */
-	bool enable_mask_output;
+	bool enable_segmentation;
 	/**
 	\brief Enable human pose estimation with skeleton keypoints output (SL_DETECTION_MODEL).
 	 */
-	enum  SL_DETECTION_MODEL model;
-	/**
-	\brief Defines if the body fitting will be applied
-	 */
-	bool enable_body_fitting;
-	/**
-	 * \brief Defines the body format outputed by the sdk when \ref retrieveObjects is called.
-	 *
-	*/
-	enum SL_BODY_FORMAT body_format;
+	enum  SL_OBJECT_DETECTION_MODEL detection_model;
 	/**
 	\brief Defines a upper depth range for detections.
 	  * \n Defined in \ref UNIT set at \ref SL_Camera::open.
@@ -1502,6 +1686,15 @@ struct SL_ObjectDetectionParameters
 	* defulat : 0.2f
 	*/
 	float prediction_timeout_s;
+	/**
+	\brief Allow inference to run at a lower precision to improve runtime and memory usage,
+	 * it might increase the initial optimization time and could include downloading calibration data or calibration cache and slightly reduce the accuracy
+	 * \note The fp16 is automatically enabled if the GPU is compatible and provides a speed up of almost x2 and reduce memory usage by almost half, no precision loss.
+	 * \note This setting allow int8 precision which can speed up by another x2 factor (compared to fp16, or x4 compared to fp32) and half the fp16 memory usage, however some accuracy can be lost.
+	 * The accuracy loss should not exceed 1-2% on the compatible models.
+	 * The current compatible models are all HUMAN_BODY_XXXX
+	 */
+	bool allow_reduced_precision_inference;
 };
 
 /**
@@ -1546,10 +1739,117 @@ struct SL_ObjectDetectionRuntimeParameters
 	 * ObjectDetectionRuntimeParameters::detection_confidence_threshold will be taken as fallback/default value
 	 */
 	int object_confidence_threshold[(int)SL_OBJECT_CLASS_LAST];
+};
+
+/**
+\brief Sets the object detection parameters.
+
+The default constructor sets all parameters to their default settings.
+
+\note Parameters can be user adjusted.
+ */
+struct SL_BodyTrackingParameters {
+	/**
+	\brief Defines a module instance id. This is used to identify which object detection model instance is used.
+	 * If the id is negative it will be auto incremented/generated
+	 */
+	unsigned int instance_module_id;
+
+	/**
+	\brief Defines if the object detection is synchronized to the image or runs in a separate thread.
+	If set to true, the detection is run for every grab, otherwise, the thread runs at its own speed, which can lead to new detection once in a while.
+	 */
+	bool image_sync;
+
+	/**
+	\brief Defines if the object detection will track objects across images flow
+	 */
+	bool enable_tracking;
+
+	/**
+	\brief Defines if the mask object will be computed
+	 */
+	bool enable_segmentation;
+
+	/**
+	\brief Enable human pose estimation with skeleton keypoints output
+	 */
+	enum SL_BODY_TRACKING_MODEL detection_model;
+
+	/**
+	\brief Defines if the body fitting will be applied
+	 */
+	bool enable_body_fitting;
+
+	/**
+	 * \brief Defines the body format output by the sdk when \ref retrieveBodies is called.
+	 *
+	 */
+	enum SL_BODY_FORMAT body_format;
+
+	/**
+	 * \brief Defines the body selection output by the sdk when \ref retrieveBodies is called.
+	 */
+	enum SL_BODY_KEYPOINTS_SELECTION body_selection;
+
+	/**
+   \brief Defines a upper depth range for detections.
+	 * \n Defined in \ref UNIT set at \ref sl::Camera::open.
+	 * \n Default value is set to \ref sl::Initparameters::depth_maximum_distance (can not be higher).
+	 */
+	float max_range;
+
+#if 0
+	/**
+	 \brief Batching system parameters.
+	 Batching system (introduced in 3.5) performs short-term re-identification with deep learning and trajectories filtering.
+	 * \n BatchParameters::enable need to be true to use this feature (by default disabled)
+	 */
+	struct SL_BatchParameters batch_parameters;
+#endif
+	/**
+	 * @brief When an object is not detected anymore, the SDK will predict its positions during a short period of time before its state switched to SEARCHING.
+	 * \n It prevents the jittering of the object state when there is a short misdetection. The user can define its own prediction time duration.
+	 *
+	 * \note During this time, the object will have OK state even if it is not detected.
+	 * \note the duration is expressed in seconds
+	 * \warning the prediction_timeout_s will be clamped to 1 second as the prediction is getting worst with time.
+	 * \warning set this parameter to 0 to disable SDK predictions
+	 */
+	float prediction_timeout_s;
+
+	/**
+	\brief Allow inference to run at a lower precision to improve runtime and memory usage,
+	 * it might increase the initial optimization time and could include downloading calibration data or calibration cache and slightly reduce the accuracy
+	 * \note The fp16 is automatically enabled if the GPU is compatible and provides a speed up of almost x2 and reduce memory usage by almost half, no precision loss.
+	 * \note This setting allow int8 precision which can speed up by another x2 factor (compared to fp16, or x4 compared to fp32) and half the fp16 memory usage, however some accuracy can be lost.
+	 * The accuracy loss should not exceed 1-2% on the compatible models.
+	 * The current compatible models are all HUMAN_BODY_XXXX
+	 */
+	bool allow_reduced_precision_inference;
+};
+
+/**
+\brief Sets the object detection runtime parameters.
+
+The default constructor sets all parameters to their default settings.
+
+\note Parameters can be user adjusted.
+ */
+struct SL_BodyTrackingRuntimeParameters {
+	/**
+	\brief Defines the confidence threshold: interval between 1 and 99. A confidence of 1 meaning a low
+	 *  threshold, more uncertain objects and 99 very few but very precise objects.
+	 * If the scene contains a lot of objects, increasing the confidence can slightly speed up the process, since every object instances are tracked.
+	 *
+	 * Default confidence threshold value, used as a fallback when BodyTrackingRuntimeParameters::object_class_detection_confidence_threshold is partially set
+	 */
+	float detection_confidence_threshold;
+
 	/**
 	\brief Defines the minimum keypoints threshold.
-	 * the SDK will outputs skeletons with more keypoints than this threshold
-	 * it is useful for example to remove unstable fitting results when a skeleton is partially occluded
+	 * the SDK will outputs skeleton with more keypoints than this threshold.
+	 * it is useful for example to remove unstable fitting results when a skeleton is partially occluded.
 	 */
 	int minimum_keypoints_threshold;
 };
@@ -1590,6 +1890,11 @@ struct SL_ObjectData
 	 */
 	enum  SL_OBJECT_ACTION_STATE action_state;
 	/**
+	\brief Defines the object 3D centroid.
+	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
+	 */
+	struct SL_Vector3 position;
+	/**
 	\brief Defines the detection confidence value of the object.
 	 * From 0 to 100, a low value means the object might not be localized perfectly or the label (OBJECT_CLASS) is uncertain.
 	 */
@@ -1601,11 +1906,6 @@ struct SL_ObjectData
 
 	//Image
 	struct SL_Vector2 bounding_box_2d[4];
-	/**
-	\brief Defines the object 3D centroid.
-	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
-	 */
-	struct SL_Vector3 position;
 	/**
 	 * \brief 3D head centroid.
 	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
@@ -1642,21 +1942,11 @@ struct SL_ObjectData
 	 */
 	struct SL_Vector3 head_bounding_box[8];
 	/**
-	 * \brief A set of useful points representing the human body, expressed in 2D, respect to the original image resolution.
-	 * We use a classic 18 points representation, the points semantic and order is given by BODY_PARTS.
-	 * Expressed in pixels on the original image resolution, [0,0] is the top left corner.
+	 * \brief bounds the head with four 2D points.
+	 * Expressed in pixels on the original image resolution.
 	  \note Not available with DETECTION_MODEL::MULTI_CLASS_BOX.
-	  \warning in some cases, eg. body partially out of the image, some keypoint can not be detected, they will have negatives coordinates.
 	 */
-	struct SL_Vector2 keypoint_2d[34];
-	/**
-	 * \brief A set of useful points representing the human body, expressed in 3D.
-	 * We use a classic 18 points representation, the points semantic and order is given by BODY_PARTS.
-	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
-	  \note Not available with DETECTION_MODEL::MULTI_CLASS_BOX.
-	  \warning in some cases, eg. body partially out of the image or missing depth data, some keypoint can not be detected, they will have non finite values.
-	 */
-	struct SL_Vector3 keypoint[34];
+	struct SL_Vector2 head_bounding_box_2d[4];
 	/**
 	\brief the covariance matrix of the 3d position, represented by its upper triangular matrix value
 	 * \code
@@ -1667,28 +1957,6 @@ struct SL_ObjectData
 	  where pi is position_covariance[i]
 	 */
 	float position_covariance[6];
-	/**
-	 * \brief Per keypoint detection confidence, can not be lower than the \ref ObjectDetectionRuntimeParameters::detection_confidence_threshold.
-	  \note Not available with DETECTION_MODEL::MULTI_CLASS_BOX.
-	  \warning in some cases, eg. body partially out of the image or missing depth data, some keypoint can not be detected, they will have non finite values.
-	 */
-	float keypoint_confidence[34];
-	/**
-	\brief Per keypoint local position (the position of the child keypoint with respect to its parent expressed in its parent coordinate frame)
-	\note it is expressed in sl::REFERENCE_CAMERA or sl::REFERENCE_WORLD
-	Not available with DETECTION_MODEL::MULTI_CLASS_BOX.
-	*/
-	struct SL_Vector3 local_position_per_joint[34];
-	/**
-		\brief Per keypoint local orientation
-		\note the orientation is represented by a quaternion which is stored in sl::float4 (sl::float4 q = sl::float4(qx,qy,qz,qw);)
-		Not available with DETECTION_MODEL::MULTI_CLASS_BOX.
-	*/
-	struct SL_Quaternion local_orientation_per_joint[34];
-	/**
-		\brief global root orientation of the skeleton. The orientation is also represented by a quaternion with the same format as \ref local_orientation_per_joint
-	*/
-	struct SL_Quaternion global_root_orientation;
 };
 
 /**
@@ -1737,12 +2005,12 @@ struct SL_Objects
 	/**
 	\brief Number of detected objects. Used to iterate through the object_list array.
 	 */
-	int nb_object;
+	int nb_objects;
 	/**
 	\brief Defines the timestamp corresponding to the frame acquisition.
 	 * This value is especially useful for the async mode to synchronize the data.
 	 */
-	unsigned long long image_ts;
+	unsigned long long timestamp;
 	/**
 	\brief Defined if the object list has already been retrieved or not.
 	 */
@@ -1754,11 +2022,168 @@ struct SL_Objects
 	/**
 	\brief Detection model used (SL_DETECTION_MODEL).
 	 */
-	enum  SL_DETECTION_MODEL detection_model;
+	enum  SL_OBJECT_DETECTION_MODEL detection_model;
 	/**
 	\brief The list of detected objects
 	 */
 	struct SL_ObjectData object_list[MAX_NUMBER_OBJECT];
+};
+
+/**
+Contains data of a detected object such as its bounding_box, label, id and its 3D position.
+*/
+struct SL_BodyData
+{
+	/**
+		\brief Object identification number, used as a reference when tracking the object through the frames
+		\note Only available if \ref ObjectDetectionParameters::enable_tracking is activated else set to -1.
+		 */
+	int id;
+	/**
+	\brief Unique ID to help identify and track AI detections. Can be either generated externally, or using \ref sl_generate_unique_id() or left empty
+	*/
+	unsigned char unique_object_id[37];
+	/**
+	\brief Defines the object tracking state (sl::OBJECT_TRACKING_STATE).
+	 */
+	enum  SL_OBJECT_TRACKING_STATE tracking_state;
+	/**
+	\brief Defines the object action state (sl::OBJECT_ACTION_STATE).
+	 */
+	enum  SL_OBJECT_ACTION_STATE action_state;
+	/**
+	\brief Defines the object 3D centroid.
+	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
+	 */
+	struct SL_Vector3 position;
+	/**
+	\brief Defines the object 3D velocity
+	 * Defined in \ref sl:InitParameters::UNIT / seconds, expressed in \ref RuntimeParameters::measure3D_reference_frame.
+	 */
+	struct SL_Vector3 velocity;
+	/**
+	\brief the covariance matrix of the 3d position, represented by its upper triangular matrix value
+	 * \code
+		 = [p0, p1, p2]
+		   [p1, p3, p4]
+		   [p2, p4, p5]
+	  \endcode
+	  where pi is position_covariance[i]
+	 */
+	float position_covariance[6];
+	/**
+	\brief Defines the detection confidence value of the object.
+	 * From 0 to 100, a low value means the object might not be localized perfectly or the label (OBJECT_CLASS) is uncertain.
+	 */
+	float confidence;
+	//Mask
+	int* mask;
+	//int* mask; //IntPtr to an sl::Mat object.
+
+	//Image
+	struct SL_Vector2 bounding_box_2d[4];
+	/**
+	 * \brief 3D head centroid.
+	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
+	 */
+	struct SL_Vector3 head_position;
+
+	/**
+	 * \brief 3D object dimensions: width, height, length. Defined in SL_InitParameters_UNIT, expressed in SL_RuntimeParameters::measure3D_reference_frame.
+	 */
+	struct SL_Vector3 dimensions;
+	/**
+	 * \brief 3D bounding box of the person represented as eight 3D points
+	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
+	 *
+	 * \code
+		   1 ------ 2
+		  /        /|
+		 0 ------ 3 |
+		 | Object | 6
+		 |        |/
+		 4 ------ 7
+	 \endcode
+	 */
+	struct SL_Vector3 bounding_box[8];
+	/**
+	 * \brief bounds the head with eight 3D points.
+	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
+	 */
+	struct SL_Vector3 head_bounding_box[8];
+	/**
+	 * \brief bounds the head with four 2D points.
+	 * Expressed in pixels on the original image resolution.
+	 */
+	struct SL_Vector2 head_bounding_box_2d[4];
+	/**
+	 * \brief A set of useful points representing the human body, expressed in 2D, respect to the original image resolution.
+	 * We use a classic 18 points representation, the points semantic and order is given by BODY_PARTS.
+	 * Expressed in pixels on the original image resolution, [0,0] is the top left corner.
+	  \warning in some cases, eg. body partially out of the image, some keypoint can not be detected, they will have negatives coordinates.
+	 */
+	struct SL_Vector2 keypoint_2d[70];
+	/**
+	 * \brief A set of useful points representing the human body, expressed in 3D.
+	 * We use a classic 18 points representation, the points semantic and order is given by BODY_PARTS.
+	 * Defined in \ref sl:InitParameters::UNIT, expressed in \ref RuntimeParameters::measure3D_reference_frame.
+	  \warning in some cases, eg. body partially out of the image or missing depth data, some keypoint can not be detected, they will have non finite values.
+	 */
+	struct SL_Vector3 keypoint[70];
+
+	/**
+	 * \brief Per keypoint detection confidence, can not be lower than the \ref ObjectDetectionRuntimeParameters::detection_confidence_threshold.
+	  \warning in some cases, eg. body partially out of the image or missing depth data, some keypoint can not be detected, they will have non finite values.
+	 */
+	float keypoint_confidence[70];
+	/**
+	 * \brief Per keypoint detection 3d covariance
+	  \warning in some cases, eg. body partially out of the image or missing depth data, some keypoint can not be detected, they covariance will be 0.
+	  see \ref position_covariance for the storage format
+	 */
+	float keypoint_covariances[70][6];
+	/**
+	\brief Per keypoint local position (the position of the child keypoint with respect to its parent expressed in its parent coordinate frame)
+	\note it is expressed in sl::REFERENCE_CAMERA or sl::REFERENCE_WORLD
+	*/
+	struct SL_Vector3 local_position_per_joint[70];
+	/**
+		\brief Per keypoint local orientation
+		\note the orientation is represented by a quaternion which is stored in sl::float4 (sl::float4 q = sl::float4(qx,qy,qz,qw);)
+	*/
+	struct SL_Quaternion local_orientation_per_joint[70];
+	/**
+		\brief global root orientation of the skeleton. The orientation is also represented by a quaternion with the same format as \ref local_orientation_per_joint
+	*/
+	struct SL_Quaternion global_root_orientation;
+};
+
+/**
+Contains the result of the body detection module.
+*/
+struct SL_Bodies
+{
+	/**
+	\brief Number of detected bodies. Used to iterate through the object_list array.
+	 */
+	int nb_bodies;
+	/**
+	\brief Defines the timestamp corresponding to the frame acquisition.
+	 * This value is especially useful for the async mode to synchronize the data.
+	 */
+	unsigned long long timestamp;
+	/**
+	\brief Defined if the object list has already been retrieved or not.
+	 */
+	int is_new;
+	/**
+	\brief Defined if both the object tracking and the world orientation has been setup.
+	 */
+	int is_tracked;
+	/**
+	\brief The list of detected objects
+	 */
+	struct SL_BodyData body_list[MAX_NUMBER_OBJECT];
 };
 
 /**
@@ -1778,13 +2203,36 @@ struct SL_ObjectsBatch {
 	struct SL_Vector3 bounding_boxes[MAX_TRAJECTORY_SIZE][8];
 	float confidences[MAX_TRAJECTORY_SIZE];
 	enum SL_OBJECT_ACTION_STATE action_states[MAX_TRAJECTORY_SIZE];
-	struct SL_Vector2 keypoints_2d[MAX_TRAJECTORY_SIZE][18];
-	struct SL_Vector3 keypoints[MAX_TRAJECTORY_SIZE][18];
 	struct SL_Vector2 head_bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4];
 	struct SL_Vector3 head_bounding_boxes[MAX_TRAJECTORY_SIZE][8];
 	struct SL_Vector3 head_positions[MAX_TRAJECTORY_SIZE];
-	float keypoints_confidences[MAX_TRAJECTORY_SIZE][18];
 };
+
+#if 0
+/**
+* \brief Bodies batch structure
+*/
+struct SL_BodiesBatch {
+	int nb_data;
+	int id;
+	enum SL_OBJECT_TRACKING_STATE tracking_state;
+	struct SL_Vector3 positions[MAX_TRAJECTORY_SIZE];
+	float position_covariances[MAX_TRAJECTORY_SIZE][6];
+	struct SL_Vector3 velocities[MAX_TRAJECTORY_SIZE];
+	unsigned long long timestamps[MAX_TRAJECTORY_SIZE];
+	struct SL_Vector2 bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4];
+	struct SL_Vector3 bounding_boxes[MAX_TRAJECTORY_SIZE][8];
+	float confidences[MAX_TRAJECTORY_SIZE];
+	enum SL_OBJECT_ACTION_STATE action_states[MAX_TRAJECTORY_SIZE];
+	struct SL_Vector2 keypoints_2d[MAX_TRAJECTORY_SIZE][70];
+	struct SL_Vector3 keypoints[MAX_TRAJECTORY_SIZE][70];
+	struct SL_Vector2 head_bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4];
+	struct SL_Vector3 head_bounding_boxes[MAX_TRAJECTORY_SIZE][8];
+	struct SL_Vector3 head_positions[MAX_TRAJECTORY_SIZE];
+	float keypoints_confidences[MAX_TRAJECTORY_SIZE][70];
+};
+
+#endif
 
 /*
 Defines a 2D rectangle with top-left corner coordinates and width/height in pixels.
@@ -1799,10 +2247,62 @@ struct SL_Rect
 
 #endif
 
+struct SL_InputType
+{
+	enum SL_INPUT_TYPE input_type;
+	unsigned int serial_number;
+	unsigned int id;
+	char svo_input_filename[256];
+	char stream_input_ip[128];
+	unsigned short stream_input_port;
+};
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////// MULTI CAM API /////////////////////////////////////////////////////////////
+/////////////////////////////// FUSION API /////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum SL_FUSION_ERROR_CODE {
+	SL_FUSION_ERROR_CODE_WRONG_BODY_FORMAT = -7, /**< The requested body tracking model is not available*/
+	SL_FUSION_ERROR_CODE_NOT_ENABLE = -6, /**< The following module was not enabled*/
+	SL_FUSION_ERROR_CODE_INPUT_FEED_MISMATCH = -5, /**< Some source are provided by SVO and some sources are provided by LIVE stream */
+	SL_FUSION_ERROR_CODE_CONNECTION_TIMED_OUT = -4, /**< Connection timed out ... impossible to reach the sender... this may be due to ZedHub absence*/
+	SL_FUSION_ERROR_CODE_MEMORY_ALREADY_USED = -3, /**< Detect multiple instance of SHARED_MEMORY communicator ... only one is authorised*/
+	SL_FUSION_ERROR_CODE_BAD_IP_ADDRESS = -2, /**< The IP format provided is wrong, please provide IP in this format a.b.c.d where (a, b, c, d) are numbers between 0 and 255.*/
+	SL_FUSION_ERROR_CODE_FAILURE = -1, /**< Standard code for unsuccessful behavior.*/
+	SL_FUSION_ERROR_CODE_SUCCESS = 0,
+	SL_FUSION_ERROR_CODE_FUSION_ERRATIC_FPS = 1, /**< Some big differences has been observed between senders FPS*/
+	SL_FUSION_ERROR_CODE_FUSION_FPS_TOO_LOW = 2 /**< At least one sender has fps lower than 10 FPS*/
+};
+
+enum SL_SENDER_ERROR_CODE {
+	SL_SENDER_ERROR_CODE_DISCONNECTED = -1, /**< the sender has been disconnected*/
+	SL_SENDER_ERROR_CODE_SUCCESS = 0,
+	SL_SENDER_ERROR_CODE_GRAB_ERROR = 1, /**< the sender has encountered an grab error*/
+	SL_SENDER_ERROR_CODE_ERRATIC_FPS = 2, /**< the sender does not run with a constant frame rate*/
+	SL_SENDER_ERROR_CODE_FPS_TOO_LOW = 3 /**< fps lower than 10 FPS*/
+};
+
+enum SL_COMM_TYPE
+{
+	SL_COMM_TYPE_LOCAL_NETWORK, /* the sender and receiver are on the samed local network and communicate by RTP, communication can be affected by the network load.*/
+	SL_COMM_TYPE_INTRA_PROCESS /* both sender and receiver are declared by the same process, can be in different threads, this communication is optimized.*/
+};
+
+struct  SL_CommunicationParameters
+{
+	enum SL_COMM_TYPE communication_type;
+	unsigned int ip_port;
+	char ip_add[128];
+};
+
+struct SL_FusionConfiguration {
+	int serial_number;
+	struct SL_CommunicationParameters comm_param;
+	struct SL_Vector3 position;
+	struct SL_Quaternion rotation;
+	struct SL_InputType input_type;
+};
 
 
 struct SL_InitFusionParameters
@@ -1837,30 +2337,30 @@ struct SL_InitFusionParameters
 	unsigned int timeout_period_number;
 };
 
-struct SL_InitCameraParameters {
-	float depth_maximum_distance;
-	float detection_confidence_threshold;
-	CUdevice sdk_gpu_id;
-	int confidence_threshold;
+/**
+ * 
+ *
+ */
+struct SL_PositionalTrackingFusionParameters {
+	/**
+	 * @brief Is the gnss fusion is enabled
+	 *
+	 */
+	bool enable_GNSS_fusion;
+	/**
+	 * @brief Distance necessary for initializing the transformation between cameras coordinate system and  GNSS coordinate system (north aligned)
+	 *
+	 */
+	float gnss_initialisation_distance;
+	/**
+	 * @brief Value used by Fusion for ignoring high covariance input GNSS data
+	 *
+	 */
+	float gnss_ignore_threshold;
 };
 
-struct SL_ObjectDetectionFusionParameters
+struct SL_BodyTrackingFusionParameters
 {
-	enum SL_DETECTION_MODEL detection_model;
-
-	/**
-	 * \brief Defines the body format outputed by the sdk when \ref retrieveObjects is called.
-	 * \warning if BODY_FORMAT::POSE_34, the ZED SDK will automatically enable the fitting \ref enable_body_fitting
-	 *
-	 */
-	enum SL_BODY_FORMAT body_format;
-
-	/**
-	 * @brief not yet available for this version
-	 *
-	 */
-	//char* reid_database_file;
-
 	/**
 	* \brief Defines if the object detection will track objects across images flow
 	*/
@@ -1870,10 +2370,9 @@ struct SL_ObjectDetectionFusionParameters
 	* \brief Defines if the body fitting will be applied
 	*/
 	bool enable_body_fitting;
-
 };
 
-struct SL_ObjectDetectionFusionRuntimeParameters
+struct SL_BodyTrackingFusionRuntimeParameters
 {
 	/**
 	* @brief if the fused skeleton has less than skeleton_minimum_allowed_keypoints keypoints, it will be discarded. Default is -1.
@@ -1884,18 +2383,107 @@ struct SL_ObjectDetectionFusionRuntimeParameters
 	 * @brief if a skeleton was detected in less than skeleton_minimum_allowed_camera cameras, it will be discarded
 	 *
 	 */
-	int skeleton_minimum_allowed_camera = -1;
+	int skeleton_minimum_allowed_camera;
 
 	/**
 	 * @brief this value controls the smoothing of the tracked or fitted fused skeleton.
 	 * it is ranged from 0 (low smoothing) and 1 (high smoothing)
 	 */
-	float skeleton_smoothing = 0.f;
-
+	float skeleton_smoothing;
 };
 
 struct SL_CameraIdentifier {
-	uint64_t sn;
+	unsigned long long int sn;
+};
+
+struct SL_CameraMetrics
+{
+	struct SL_CameraIdentifier uuid;
+
+	// gives the fps of the received datas
+	float received_fps;
+
+	// gives the latency (in second) of the received datas
+	float received_latency;
+
+	// gives the latency (in second) after Fusion synchronization
+	float synced_latency;
+
+	// if no data present is set to false
+	bool is_present;
+
+	// percent of detection par image during the last second in %, a low values means few detections occurs lately
+	float ratio_detection;
+
+	// percent of detection par image during the last second in %, a low values means few detections occurs lately
+	float delta_ts;
+};
+
+struct SL_FusionMetrics {
+
+	// mean number of camera that provides data during the past second
+	float mean_camera_fused;
+
+	// mean number of camera that provides data during the past second
+	float mean_stdev_between_camera;
+
+	struct SL_CameraMetrics camera_individual_stats[MAX_FUSED_CAMERAS];
+};
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// GNSS API //////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct SL_GNSSData
+{
+	// longitude in radian
+	double longitude;
+	// latitude in radian
+	double latitude;
+	// altitude in meter
+	double altitude;
+	// Timestamp
+	unsigned long long ts;
+
+	double position_covariance[9];
+
+	double longitude_std;
+	double latitude_std;
+	double altitude_std;
+};
+
+struct SL_LatLng
+{
+	double latitude;
+	double longitude;
+	double altitude;
+};
+
+
+struct SL_GeoPose
+{
+	struct SL_Vector3 translation;
+	struct SL_Quaternion rotation;
+	float pose_covariance[36];
+	double horizontal_accuracy;
+	double vertical_accuracy;
+	struct SL_LatLng latlng_coordinates;
+	double heading;
+};
+
+struct SL_ECEF 
+{
+	double x;
+	double y;
+	double z;
+};
+struct SL_UTM
+{
+	double northing;
+	double easting;
+	double gamma;
+	char UTMZone[256];
 };
 
 #endif

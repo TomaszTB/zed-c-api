@@ -67,6 +67,7 @@ extern "C" {
     \brief Opens the camera depending on the init parameters.
     \param camera_id : id of the camera.
     \param init_parameters : structure containing all the initial parameters.
+    \param serial number : serial number of the camera.
     \param path_svo : filename of the svo (for SVO input).
     \param ip : ip of the camera to open (for Stream input).
     \param stream_port : port of the camera to open (for Stream input).
@@ -75,7 +76,10 @@ extern "C" {
     \param opencv_calib_path : optional openCV calibration file. Equivalent to  \ref InitParameters::optional_opencv_calibration_file.
     \return An error code giving information about the internal process. If SUCCESS (0) is returned, the camera is ready to use. Every other code indicates an error and the program should be stopped.
     */
-    INTERFACE_API int sl_open_camera(int camera_id, struct SL_InitParameters* init_parameters, const char* path_svo, const char* ip, int stream_port, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
+    INTERFACE_API int sl_open_camera(int camera_id, struct SL_InitParameters* init_parameters, const unsigned int serial_number,  const char* path_svo, const char* ip, int stream_port, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
+
+
+    INTERFACE_API void sl_start_publishing(int camera_id, struct SL_CommunicationParameters* comm_params);
 
     /**
     \brief Gets the Camera-created CUDA context for sharing it with other CUDA-capable libraries.
@@ -380,7 +384,7 @@ extern "C" {
     \param mode : Setting to be changed
     \param value : new value
      */
-    INTERFACE_API void sl_set_camera_settings(int camera_id, enum SL_VIDEO_SETTINGS mode, int value);
+    INTERFACE_API enum SL_ERROR_CODE sl_set_camera_settings(int camera_id, enum SL_VIDEO_SETTINGS mode, int value);
 
     /**
     \brief Sets the region of interest for automatic exposure/gain computation
@@ -390,7 +394,7 @@ extern "C" {
     \param reset : reset aestruct C_agc if true.
     \return SL_ERROR_CODE::SUCCESS if ROI has been applied. Other ERROR_CODE otherwise.
      */
-    INTERFACE_API int sl_set_roi_for_aec_agc(int camera_id, enum SL_SIDE side, struct SL_Rect* roi, bool reset);
+    INTERFACE_API enum SL_ERROR_CODE sl_set_roi_for_aec_agc(int camera_id, enum SL_SIDE side, struct SL_Rect* roi, bool reset);
 
     /**
     \brief Gets the value of a given setting from the ZED camera.
@@ -399,7 +403,7 @@ extern "C" {
     \param value : the requested setting value.
     \return ERROR_CODE to indicate if the function was successfull.If successfull, setting will be filled with the corresponding value.
      */
-    INTERFACE_API SL_ERROR_CODE sl_get_camera_settings(int c_id, enum SL_VIDEO_SETTINGS mode, int* value);
+    INTERFACE_API enum SL_ERROR_CODE sl_get_camera_settings(int c_id, enum SL_VIDEO_SETTINGS mode, int* value);
 
     /**
     \brief Gets the region of interest for automatic exposure/gain computation
@@ -408,7 +412,7 @@ extern "C" {
     \param roi [Out] : Region of interest.
     \return SL_ERROR_CODE::SUCCESS if ROI has been applied. Other ERROR_CODE otherwise.
      */
-    INTERFACE_API int sl_get_roi_for_aec_agc(int id, enum SL_SIDE side, struct SL_Rect* roi);
+    INTERFACE_API enum SL_ERROR_CODE sl_get_roi_for_aec_agc(int id, enum SL_SIDE side, struct SL_Rect* roi);
 
     /**
     \brief Gets the depth min value from InitParameters (see \ref SL_InitParameters::depth_minimum_distance).
@@ -566,7 +570,7 @@ extern "C" {
     \param time_reference : time reference.
     \return ERROR_CODE::SUCCESS if sensors data have been extracted.
      */
-    INTERFACE_API int sl_get_sensors_data(int camera_id, struct SL_SensorData* data, enum SL_TIME_REFERENCE time_reference);
+    INTERFACE_API int sl_get_sensors_data(int camera_id, struct SL_SensorsData* data, enum SL_TIME_REFERENCE time_reference);
 
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1027,14 +1031,14 @@ extern "C" {
              - \ref ERROR_CODE::INVALID_FUNCTION_CALL : if one of the ObjectDetection parameter is not compatible with other modules parameters (For example, depth mode has been set to NONE).\n
              - \ref ERROR_CODE::FAILURE : otherwise.\n
      */
-    INTERFACE_API int sl_enable_objects_detection(int camera_id, struct SL_ObjectDetectionParameters* object_detection_parameters);
+    INTERFACE_API int sl_enable_object_detection(int camera_id, struct SL_ObjectDetectionParameters* object_detection_parameters);
 
     /**
     \brief Returns the object detection parameters used. Correspond to the structure send when the \ref enableObjectDetection() function was called.
     \param camera_id : id of the camera instance.
     \return \ref ObjectDetectionParameters containing the parameters used for object detection initialization.
      */
-    INTERFACE_API struct SL_ObjectDetectionParameters* sl_get_object_detection_parameters(int cmaera_id);
+    INTERFACE_API struct SL_ObjectDetectionParameters* sl_get_object_detection_parameters(int camera_id);
 
     /**
     \brief Pauses or resumes the object detection processes.
@@ -1045,15 +1049,65 @@ extern "C" {
     The \ref retrieveObjects function will keep on returning the last objects detected while in pause.
 
     \param status : If true, object detection is paused. If false, object detection is resumed.
+    \params instance_id . Id of the Object detection instance. Used when multiple instances of the OD module are enabled at the same time.
      */
-    INTERFACE_API void sl_pause_objects_detection(int camera_id, bool status);
+    INTERFACE_API void sl_pause_object_detection(int camera_id, bool status, unsigned int instance_id);
     /**
     \brief Disables the Object Detection process.
 
     The object detection module immediately stops and frees its memory allocations.
     \param camera_id : id of the camera instance.
+    \params instance_id : Id of the Object detection instance. Used when multiple instances of the OD module are enabled at the same time.
+    \params force_disable_all_instances : Disable all the instances of the OD module currently enabled.
      */
-    INTERFACE_API void sl_disable_objects_detection(int camera_id);
+    INTERFACE_API void sl_disable_object_detection(int camera_id, unsigned int instance_id, bool force_disable_all_instances);
+
+    /**
+    \brief Initializes and starts the Deep Learning detection module.
+    - Human skeleton detection with the \ref DETECTION_MODEL::HUMAN_BODY_FAST,\ref DETECTION_MODEL::HUMAN_BODY_MEDIUM or \ref DETECTION_MODEL::HUMAN_BODY_ACCURATE.
+    This model only detects humans but also provides a full skeleton map for each person.
+
+    Detected objects can be retrieved using the \ref retrieve_bodies() function.
+    \param camera_id : id of the camera instance.
+    \param object_detection_parameters : structure containing all specific parameters for object detection (see \ref SL_BodyTrackingParameters).
+    \return
+             - \ref ERROR_CODE::SUCCESS : if everything went fine.\n
+             - \ref ERROR_CODE::CORRUPTED_SDK_INSTALLATION : if the AI model is missing or corrupted. In this case, the SDK needs to be reinstalled.\n
+             - \ref ERROR_CODE::MODULE_NOT_COMPATIBLE_WITH_CAMERA : if the camera used does not have a IMU (ZED Camera). the IMU gives the gravity vector that helps in the 3D box localization.\n
+             - \ref ERROR_CODE::MOTION_SENSORS_REQUIRED : if the camera model is correct (ZED2/ZED2i) but the IMU is missing. It probably happens because InitParameters::disable_sensors was set to true.\n
+             - \ref ERROR_CODE::INVALID_FUNCTION_CALL : if one of the ObjectDetection parameter is not compatible with other modules parameters (For example, depth mode has been set to NONE).\n
+             - \ref ERROR_CODE::FAILURE : otherwise.\n
+     */
+    INTERFACE_API int sl_enable_body_tracking(int camera_id, struct SL_BodyTrackingParameters* body_tracking_parameters);
+
+    /**
+    \brief Returns the object detection parameters used. Correspond to the structure send when the \ref sl_enable_body_tracking() function was called.
+
+    \return \ref BodyTrackingParameters containing the parameters used for object detection initialization.
+     */
+    INTERFACE_API struct SL_BodyTrackingParameters* sl_get_body_tracking_parameters(int camera_id);
+
+    /**
+    \brief Pauses or resumes the body tracking processes.
+
+    If the body tracking has been enabled with  \ref BodyTrackingParameters::image_sync set to false (running asynchronously), this function will pause processing.
+
+    While in pause, calling this function with <i>status = false</i> will resume the body tracking.
+    The \ref retrieveBodies function will keep on returning the last objects detected while in pause.
+
+    \param status : If true, body tracking is paused. If false, object detection is resumed.
+    \params instance_id . Id of the body tracking instance. Used when multiple instances of the BT module are enabled at the same time.
+     */
+    INTERFACE_API void sl_pause_body_tracking(int camera_id, bool status, unsigned int instance_id);
+    /**
+    \brief Disables the body tracking process.
+
+    The body tracking module immediately stops and frees its memory allocations.
+    \param camera_id : id of the camera instance.
+    \params instance_id : Id of the Object detection instance. Used when multiple instances of the BT module are enabled at the same time.
+    \params force_disable_all_instances : Disable all the instances of the BT module currently enabled.
+     */
+    INTERFACE_API void sl_disable_body_tracking(int camera_id, unsigned int instance_id, bool force_disable_all_instances);
 
     /**
     \brief Generate a UUID like unique ID to help identify and track AI detections
@@ -1079,7 +1133,17 @@ extern "C" {
     \param object_detection_runtime_parameters : Object detection runtime settings, can be changed at each detection. In async mode, the parameters update is applied on the next iteration.
     \return \ref SUCCESS if everything went fine, \ref ERROR_CODE::FAILURE otherwise
      */
-    INTERFACE_API int sl_retrieve_objects(int camera_id, struct SL_ObjectDetectionRuntimeParameters* object_detection_runtime_parameters, struct SL_Objects* objects);
+    INTERFACE_API int sl_retrieve_objects(int camera_id, struct SL_ObjectDetectionRuntimeParameters* object_detection_runtime_parameters, struct SL_Objects* objects, unsigned int instance_id);
+
+    /**
+    \brief Retrieve objects detected by the object detection module.
+    \param camera_id : id of the camera instance.
+    \param bodies : The detected bodies will be saved into this object. If the object already contains data from a previous detection, it will be updated, keeping a unique ID for the same person.
+    \param body_tracking_runtime_parameters : Body Tracking runtime settings, can be changed at each detection. In async mode, the parameters update is applied on the next iteration.
+    \return \ref SUCCESS if everything went fine, \ref ERROR_CODE::FAILURE otherwise
+     */
+    INTERFACE_API int sl_retrieve_bodies(int camera_id, struct SL_BodyTrackingRuntimeParameters* body_tracking_runtime_parameters, struct SL_Bodies* bodies, unsigned int instance_id);
+
 
     /**
     \brief Updates the internal batch of detected objects.
@@ -1092,45 +1156,38 @@ extern "C" {
     /**
     \brief Gets a batch of detected objects. Need to be called after update_objects_batch().
     \param camera_id : id of the camera instance.
-    \param index : index of the batch to retrieve ([0, nb_batches]).
-    \param nb_data : number of detected objects in the batch.
-    \param id : The trajectory ID.
-    \param label : Object Category. Identify the object type (SL_OBJECT_CLASS).
-    \param sublabel : Object subclass (SL_OBJECT_SUBCLASS).
-    \param tracking_state : defines the object tracking state (SL_OBJECT_TRACKING_STATE).
-    \param positions : a sample of 3D positions.
-    \param position_covariances : a sample of the associated position covariances.
-    \param velocities : a sample of 3D velocity.
-    \param timestamps : The associated position timestamp.
-    \param bounding_boxes_2d : 2D bounding box of the person represented as four 2D points starting at the top left corner and rotation clockwise.
-     Expressed in pixels on the original image resolution, [0,0] is the top left corner.
-                     A ------ B
-                     | Object |
-                     D ------ C
-    \param bounding_box : a sample of 3d bounding boxes.
-    \param confidences : a sample of object detection confidence.
-    \param action_states : a sample of object action state (SL_OBJECT_ACTION_STATE).
-    \param keypoints_2d : a sample of 2d position keypoints.
-    Not available with DETECTION_MODE::MULTI_CLASS_BOX.
-    \param keypoints : a sample of 3d position keypoints.
-    Not available with DETECTION_MODE::MULTI_CLASS_BOX.
-    \param head_bounding_boxes_2d : bounds the head with four 2D points.
-    Not available with DETECTION_MODE::MULTI_CLASS_BOX.
-    \param head_bounding_boxes :  bounds the head with eight 3D points.
-    Not available with DETECTION_MODE::MULTI_CLASS_BOX.
-    \param head_positions : 3D head centroids.
-    \param keypoint_confidences : Per keypoint detection confidence, can not be lower than the \ref ObjectDetectionRuntimeParameters::detection_confidence_threshold.
-    Not available with DETECTION_MODEL::MULTI_CLASS_BOX.
+    \param objs_batch : Structure containing  all the specific data of the object batch module
     \return \ref SUCCESS if everything went fine, \ref ERROR_CODE::FAILURE otherwise
      */
     INTERFACE_API int sl_get_objects_batch(int camera_id, int index, struct SL_ObjectsBatch* objs_batch);
 
-
     INTERFACE_API int sl_get_objects_batch_csharp(int camera_id, int index, int* nb_data, int* id, int* label, int* sublabel, int* tracking_state,
         struct SL_Vector3 positions[MAX_TRAJECTORY_SIZE], float position_covariances[MAX_TRAJECTORY_SIZE][6], struct SL_Vector3 velocities[MAX_TRAJECTORY_SIZE], unsigned long long timestamps[MAX_TRAJECTORY_SIZE],
         struct SL_Vector2 bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], struct SL_Vector3 bounding_boxes[MAX_TRAJECTORY_SIZE][8], float confidences[MAX_TRAJECTORY_SIZE], int action_states[MAX_TRAJECTORY_SIZE],
-        struct SL_Vector2 keypoints_2d[MAX_TRAJECTORY_SIZE][18], struct SL_Vector3 keypoints[MAX_TRAJECTORY_SIZE][18], struct SL_Vector2 head_bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], struct SL_Vector3 head_bounding_boxes[MAX_TRAJECTORY_SIZE][8],
-        struct SL_Vector3 head_positions[MAX_TRAJECTORY_SIZE], float keypoints_confidences[MAX_TRAJECTORY_SIZE][18]);
+        struct SL_Vector2 head_bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], struct SL_Vector3 head_bounding_boxes[MAX_TRAJECTORY_SIZE][8],
+        struct SL_Vector3 head_positions[MAX_TRAJECTORY_SIZE]);
+
+#if 0
+    /**
+    \brief Updates the internal batch of detected bodies.
+    \param camera_id : id of the camera instance.
+    \param [Out] : number of batches.
+    \return \ref SUCCESS if everything went fine, \ref ERROR_CODE::FAILURE otherwise
+     */
+    INTERFACE_API int sl_update_bodies_batch(int camera_id, int* nb_batches);
+
+
+
+    /**
+    \brief Gets a batch of detected objects. Need to be called after update_objects_batch().
+    \param camera_id : id of the camera instance.
+    \param bodies_batch : Structure containing  all the specific data of the bodies batch module
+    \return \ref SUCCESS if everything went fine, \ref ERROR_CODE::FAILURE otherwise
+     */
+    INTERFACE_API int sl_get_bodies_batch(int camera_id, int index, struct SL_BodiesBatch* bodies_batch);
+
+
+#endif
 #endif
 #ifdef __cplusplus
 }
@@ -1144,33 +1201,157 @@ extern "C" {
 extern "C" {
 #endif
     
-    INTERFACE_API SL_ERROR_CODE slmc_init(struct SL_InitFusionParameters* params);
+    /** \brief FusionHandler initialisation. Initializes memory/generic datas
+    * \param [in] params : structure containing all init parameters for the fusion API
+    * \return SL_FUSION_ERROR_CODE
+    */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_init(struct SL_InitFusionParameters* params);
+    
+    /** \brief process the fusion.
+    * \return SL_FUSION_ERROR_CODE
+    */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_process();
 
-    INTERFACE_API SL_ERROR_CODE slmc_process();
+    /*
+    * \brief adds a camera to the multi camera handler
+    * \param [in] uuid : unique ID that is associated with the camera for easy access.
+    * \param [in] params : communications parameters
+    * \param [in] pose_translation : position of the camera
+    * \param [in] pose_rotation : orientation of the camera
+    * \return SL_FUSION_ERROR_CODE
+    * */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_subscribe(struct SL_CameraIdentifier* uuid, struct SL_CommunicationParameters* params, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
 
-    INTERFACE_API SL_ERROR_CODE slmc_subscribe(struct SL_CameraIdentifier* uuid, char json_config_filename[256]);
+
+    /*
+    * \brief update the pose of the camera in the fusion coordinate space
+    * \param [in] uuid : unique ID that is associated with the camera for easy access.
+    * \param [in] pose_translation : new position of the camera
+    * \param [in] pose_rotation : new orientation of the camera
+    * \return SL_FUSION_ERROR_CODE
+    * */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_update_pose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
+    
+    /*
+    * \brief update the pose of the camera in the fusion coordinate space
+    * \param [in] uuid : unique ID that is associated with the camera for easy access.
+    * \param [in] pose_translation : new position of the camera
+    * \param [in] pose_rotation : new orientation of the camera
+    * \return SL_FUSION_ERROR_CODE
+    * */
+    INTERFACE_API enum SL_SENDER_ERROR_CODE sl_fusion_get_sender_state(struct SL_CameraIdentifier* uuid);
+
+    INTERFACE_API void sl_fusion_read_configuration_file(char json_config_filename[256], enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration* configs, int* nb_cameras);
 
     /////////////////////////////////////////////////////////////////////
     ///////////////////// Object Detection Fusion ///////////////////////
     /////////////////////////////////////////////////////////////////////
 
-    /// \brief enables Object detection fusion module
-    /// \param [in] parameters defined by \ref sl::ObjectDetectionFusionParameters
-    /// \return
-    INTERFACE_API SL_ERROR_CODE slmc_enable_object_detection_fusion(struct SL_ObjectDetectionFusionParameters* params);
+    /** \brief enables Object detection fusion module
+    * \param [in] parameters defined by \ref sl::ObjectDetectionFusionParameters
+    * \return SL_FUSION_ERROR_CODE
+    */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_enable_body_tracking(struct SL_BodyTrackingFusionParameters* params);
 
 	/**
 	\brief Disable the object detection module.
 	 */
-	INTERFACE_API void slmc_disable_object_detection_fusion();
+	INTERFACE_API void sl_fusion_disable_body_tracking();
 
-    //Call to retrieve a single struc of slobjects (fused)
-    INTERFACE_API SL_ERROR_CODE slmc_retrieve_fused_objects(struct SL_Objects* objects, struct SL_ObjectDetectionFusionRuntimeParameters* rt);
+    /**
+    * \brief retrieves a list of bodies (in SL_Bodies class type) seen by all cameras and merged as if it was seen by a single super-camera.
+    *\note Internal calls retrieveObjects() for all listed cameras, then merged into a single SL_Bodies
+    * \param [out] bodies: list of objects seen by all available cameras
+    * \note Only the 3d informations is available in the returned object.
+    * \return SL_FUSION_ERROR_CODE
+    */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_retrieve_bodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid);
+
+    /**
+     * \brief get the stats of a given camera in the Fusion API side
+     * It can be the received FPS, drop frame, latency, etc
+     * \param metrics : structure containing all the metrics available
+     * \return SL_FUSION_ERROR_CODE
+     */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_get_process_metrics(struct SL_FusionMetrics* metrics);
+
+
+    /////////////////////////////////////////////////////////////////////
+    ///////////////////// Positional tracking  //////////////////////////
+    /////////////////////////////////////////////////////////////////////
+
+    /**
+    * \brief enable positional tracking fusion.
+    * \note note that for the alpha version of the API, the positional tracking fusion doesn't support the area memory feature
+    *
+    * \return SL_FUSION_ERROR_CODE
+    */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_enable_positional_tracking(struct SL_PositionalTrackingFusionParameters* params);
+
+    /**
+     * \brief Get the Fused Position of the camera system
+     *
+     * \param camera_pose will contain the camera pose in world position (world position is given by the calibration of the cameras system)
+     * \param reference_frame defines the reference from which you want the pose to be expressed. Default : \ref REFERENCE_FRAME "REFERENCE_FRAME::WORLD".
+     * \param uuid Camera identifier
+     * \return POSITIONAL_TRACKING_STATE is the current state of the tracking process
+     */
+    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_position(struct SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame, enum SL_COORDINATE_SYSTEM coordinate_system, enum SL_UNIT unit,
+                                                           struct SL_CameraIdentifier* uuid, enum SL_POSITION_TYPE retrieve_type);
+
+    /**
+     * \brief disable the positional tracking
+     */
+    INTERFACE_API void sl_fusion_disable_positional_tracking();
+
+    /////////////////////////////////////////////////////////////////////
+    /////////////////////////// GNSS Fusion /////////////////////////////
+    /////////////////////////////////////////////////////////////////////
+
+    /**
+     * \brief Add GNSS that will be used by fusion for computing fused pose.
+     * \param out [in]: the current GNSS data
+     * \param radian [in] : true if the gnssdata is set in radian
+     */
+    INTERFACE_API void sl_fusion_ingest_gnss_data(struct SL_GNSSData* gnss_data, bool radian);
+
+    /**
+     * @brief returns the current GNSS data
+     * \param out [out]: the current GNSS data
+     * \param radian [in] : true if the gnss data is set in radian
+     * \return POSITIONAL_TRACKING_STATE is the current state of the tracking process
+     */
+    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_current_gnss_data(struct SL_GNSSData* data, bool radian);
+
+    /**
+     * @brief returns the current GeoPose
+     * \param pose [out]: the current GeoPose
+     * \param radian [in] : true if the geopose is set in radian.
+     * \return POSITIONAL_TRACKING_STATE is the current state of the tracking process
+     */
+    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_geo_pose(struct SL_GeoPose* pose, bool radian);
+
+    /**
+     * \brief Convert latitude / longitude into position in sl::Fusion coordinate system.
+     * \param in: the current GeoPose
+     * \param out [out]: the current Pose
+     * \param radian [in] : true if the geopose is set in radian.
+     * \return POSITIONAL_TRACKING_STATE is the current state of the tracking process
+     */
+    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_geo_to_camera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian);
+
+    /**
+     * @brief returns the current GeoPose
+     * \param pose [out]: the current GeoPose
+     * \param radian [in] : true if the geopose is set in radian.
+     * \return POSITIONAL_TRACKING_STATE is the current state of the tracking process
+     */
+    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_camera_to_geo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian);
 
 	/**
 	\brief Close Multi Camera instance.
 	 */
-	INTERFACE_API void slmc_close_multi_camera();
+	INTERFACE_API void sl_fusion_close();
 
 #ifdef __cplusplus
 }
