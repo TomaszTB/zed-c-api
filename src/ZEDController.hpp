@@ -47,9 +47,10 @@ public:
 
     void destroy();
 
-    int initFromUSB(SL_InitParameters *params, const char* outputFile, const char* opt_settings_path, const char* opencv_calib_path);
+    int initFromUSB(SL_InitParameters *params, const unsigned int serial_number, const char* outputFile, const char* opt_settings_path, const char* opencv_calib_path);
     int initFromSVO(SL_InitParameters *params, const char* pathSVO, const char* outputFile, const char* opt_settings_path, const char* opencv_calib_path);
     int initFromStream(SL_InitParameters *params, const char* ip, int port, const char* outputFile, const char* opt_settings_path, const char* opencv_calib_path);
+    int initFromGMSL(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
 
     sl::POSITIONAL_TRACKING_STATE getPoseArray(float* pose, int mat_type);
 
@@ -93,7 +94,7 @@ public:
 
     sl::ERROR_CODE setIMUPriorOrientation(SL_Quaternion rotation);
     sl::ERROR_CODE getIMUOrientation(SL_Quaternion *quaternion, int time_reference);
-    sl::ERROR_CODE getSensorData(SL_SensorData *sensorData, int time_reference);
+    sl::ERROR_CODE getSensorsData(SL_SensorsData *sensorData, int time_reference);
 
     /***********Spatial mapping *********/
     sl::ERROR_CODE enableSpatialMapping(struct SL_SpatialMappingParameters mapping_param);
@@ -164,18 +165,33 @@ public:
      *************************************/
 #if WITH_OBJECT_DETECTION
     sl::ERROR_CODE enableObjectDetection(SL_ObjectDetectionParameters* objparams);
+    sl::ERROR_CODE enableBodyTracking(SL_BodyTrackingParameters* body_params);
 	SL_ObjectDetectionParameters* getObjectDetectionParameters();
-    void pauseObjectDetection(bool status);
-    void disableObjectDetection();
+    SL_BodyTrackingParameters* getBodyTrackingParameters();
+    void pauseObjectDetection(bool status, unsigned int instance_id);
+    void disableObjectDetection(unsigned int instance_id, bool force_disable_all_instances);
+    void pauseBodyTracking(bool status, unsigned int instance_id);
+    void disableBodyTracking(unsigned int instance_id, bool force_disable_all_instances);
 	sl::ERROR_CODE ingestCustomBoxObjectData(int nb_objects, SL_CustomBoxObjectData* objects_in);
-    sl::ERROR_CODE retrieveObjectDetectionData(SL_ObjectDetectionRuntimeParameters* objruntimeparams, SL_Objects* data);
+    sl::ERROR_CODE retrieveObjectDetectionData(SL_ObjectDetectionRuntimeParameters* objruntimeparams, SL_Objects* data, unsigned int instance_id);
+    sl::ERROR_CODE retrieveBodyTrackingData(SL_BodyTrackingRuntimeParameters* bodyruntimeparams, SL_Bodies* data, unsigned int instance_id);
+
     sl::ERROR_CODE updateObjectsBatch(int* nb_batches);
     sl::ERROR_CODE getObjectsBatchData(int index, struct SL_ObjectsBatch *objs);
+
 	sl::ERROR_CODE getObjectsBatchDataCSharp(int index, int* num_data, int* id, int* label, int* sublabel, int* tracking_state,
 		SL_Vector3 positions[MAX_TRAJECTORY_SIZE], float position_covariances[MAX_TRAJECTORY_SIZE][6], SL_Vector3 velocities[MAX_TRAJECTORY_SIZE], unsigned long long timestamps[MAX_TRAJECTORY_SIZE],
 		SL_Vector2 bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], SL_Vector3 bounding_boxes[MAX_TRAJECTORY_SIZE][8], float confidences[MAX_TRAJECTORY_SIZE], int action_states[MAX_TRAJECTORY_SIZE],
-		SL_Vector2 keypoints_2d[MAX_TRAJECTORY_SIZE][18], SL_Vector3 keypoints[MAX_TRAJECTORY_SIZE][18], SL_Vector2 head_bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], SL_Vector3 head_bounding_boxes[MAX_TRAJECTORY_SIZE][8],
-		SL_Vector3 head_positions[MAX_TRAJECTORY_SIZE], float keypoints_confidences[MAX_TRAJECTORY_SIZE][18]);
+		SL_Vector2 head_bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], SL_Vector3 head_bounding_boxes[MAX_TRAJECTORY_SIZE][8], SL_Vector3 head_positions[MAX_TRAJECTORY_SIZE]);
+#if 0  
+    sl::ERROR_CODE updateBodiesBatch(int* nb_batches);
+    sl::ERROR_CODE getBodiesBatchData(int index, struct SL_BodiesBatch* bodies);
+    sl::ERROR_CODE getBodiesBatchDataCSharp(int index, int* num_data, int* id, int* tracking_state,
+        SL_Vector3 positions[MAX_TRAJECTORY_SIZE], float position_covariances[MAX_TRAJECTORY_SIZE][6], SL_Vector3 velocities[MAX_TRAJECTORY_SIZE], unsigned long long timestamps[MAX_TRAJECTORY_SIZE],
+        SL_Vector2 bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], SL_Vector3 bounding_boxes[MAX_TRAJECTORY_SIZE][8], float confidences[MAX_TRAJECTORY_SIZE], int action_states[MAX_TRAJECTORY_SIZE],
+        SL_Vector2 keypoints_2d[MAX_TRAJECTORY_SIZE][70], SL_Vector3 keypoints[MAX_TRAJECTORY_SIZE][70], SL_Vector2 head_bounding_boxes_2d[MAX_TRAJECTORY_SIZE][4], SL_Vector3 head_bounding_boxes[MAX_TRAJECTORY_SIZE][8],
+        SL_Vector3 head_positions[MAX_TRAJECTORY_SIZE], float keypoints_confidences[MAX_TRAJECTORY_SIZE][70]);
+#endif
 #endif
 
     int getInputType();
@@ -228,16 +244,17 @@ private:
     int grab_count_t = 0;
     sl::Timestamp initial_Timestamp = 0;
 
-    std::vector<sl::ObjectsBatch> trajectories;
-    bool isTrajectoriesUpdated = false;
+    std::vector<sl::ObjectsBatch> objects_trajectories;
+
+    bool isObjectsTrajectoriesUpdated = false;
 
     std::vector<sl::Plane> currentPlanes;
     FILE* fskl = nullptr;
 
     int camera_ID = 0;
 
-    sl::DETECTION_MODEL current_detection_model;
-
+    sl::OBJECT_DETECTION_MODEL current_object_detection_model; 
+    sl::BODY_TRACKING_MODEL current_body_tracking_model;
 };
 
 #endif
