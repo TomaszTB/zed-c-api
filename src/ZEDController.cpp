@@ -1659,6 +1659,7 @@ sl::ERROR_CODE ZEDController::enableObjectDetection(SL_ObjectDetectionParameters
     if (!isNull()) {
         sl::ERROR_CODE v;
         sl::ObjectDetectionParameters params;
+        params.instance_module_id = obj_params->instance_module_id;
         params.image_sync = obj_params->image_sync;
         params.enable_tracking = obj_params->enable_tracking;
         params.detection_model = (sl::OBJECT_DETECTION_MODEL)obj_params->detection_model;
@@ -1692,6 +1693,7 @@ sl::ERROR_CODE ZEDController::enableBodyTracking(SL_BodyTrackingParameters* body
     if (!isNull()) {
         sl::ERROR_CODE v;
         sl::BodyTrackingParameters params;
+        params.instance_module_id = body_params->instance_module_id;
         params.image_sync = body_params->image_sync;
         params.enable_tracking = body_params->enable_tracking;
         params.enable_segmentation = body_params->enable_segmentation;
@@ -1742,6 +1744,7 @@ SL_ObjectDetectionParameters* ZEDController::getObjectDetectionParameters() {
 	c_odParams->max_range = odParams.max_range;
 	c_odParams->detection_model = (SL_OBJECT_DETECTION_MODEL)odParams.detection_model;
     c_odParams->prediction_timeout_s = odParams.prediction_timeout_s;
+    c_odParams->instance_module_id = odParams.instance_module_id;
 
 	return c_odParams;
 }
@@ -1767,6 +1770,7 @@ SL_BodyTrackingParameters* ZEDController::getBodyTrackingParameters() {
     c_btParams->max_range = btParams.max_range;
     c_btParams->detection_model = (SL_BODY_TRACKING_MODEL)btParams.detection_model;
     c_btParams->prediction_timeout_s = btParams.prediction_timeout_s;
+    c_btParams->instance_module_id = btParams.instance_module_id;
 
     return c_btParams;
 }
