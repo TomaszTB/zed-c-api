@@ -286,7 +286,7 @@ enum SL_UNIT {
 \image html CoordinateSystem.png
  */
 enum SL_COORDINATE_SYSTEM {
-	SL_COORDINATE_SYSTEM_IMAGE, /**< Standard coordinates system in computer vision. Used in OpenCV : see here : http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html */
+	SL_COORDINATE_SYSTEM_IMAGE, /**< Standard coordinates system in computer vision. Used in OpenCV : see <a href="http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html">here</a>. */
 	SL_COORDINATE_SYSTEM_LEFT_HANDED_Y_UP, /**< Left-Handed with Y up and Z forward. Used in Unity with DirectX. */
 	SL_COORDINATE_SYSTEM_RIGHT_HANDED_Y_UP, /**< Right-Handed with Y pointing up and Z backward. Used in OpenGL. */
 	SL_COORDINATE_SYSTEM_RIGHT_HANDED_Z_UP, /**< Right-Handed with Z pointing up and Y forward. Used in 3DSMax. */
@@ -941,10 +941,10 @@ enum SL_BODY_70_PARTS
 \brief Change the type of outputed position for the Fusion positional tracking (raw data or fusion data projected into zed camera)
 */
 enum SL_POSITION_TYPE {
-	RAW = 0, /*The output position will be the raw position data*/
-	FUSION, /*The output position will be the fused position projected into the requested camera repository*/
+	SL_POSITION_TYPE_RAW = 0, /*The output position will be the raw position data*/
+	SL_POSITION_TYPE_FUSION, /*The output position will be the fused position projected into the requested camera repository*/
 	///@cond SHOWHIDDEN 
-	LAST
+	SL_POSITION_TYPE_LAST
 	///@endcond
 };
 
@@ -2263,6 +2263,9 @@ struct SL_InputType
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum SL_FUSION_ERROR_CODE {
+	SL_FUSION_ERROR_CODE_NO_NEW_DATA_AVAILABLE = -10, /** < All data from all sources were consumed, no new process available.*/
+	SL_FUSION_ERROR_CODE_INVALID_TIMESTAMP = -9, /** < Problem was detected with ingested timestamp*/
+	SL_FUSION_ERROR_CODE_INVALID_COVARIANCE = -8, /** < Problem was detected with ingested covariance */
 	SL_FUSION_ERROR_CODE_WRONG_BODY_FORMAT = -7, /**< The requested body tracking model is not available*/
 	SL_FUSION_ERROR_CODE_NOT_ENABLE = -6, /**< The following module was not enabled*/
 	SL_FUSION_ERROR_CODE_INPUT_FEED_MISMATCH = -5, /**< Some source are provided by SVO and some sources are provided by LIVE stream */

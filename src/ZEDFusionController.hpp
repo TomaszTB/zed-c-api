@@ -118,7 +118,7 @@ public:
     void disablePositionalTracking();
 
 
-    void ingestGNSSData(SL_GNSSData* data, bool radian);
+    SL_FUSION_ERROR_CODE ingestGNSSData(SL_GNSSData* data, bool radian);
 
     SL_POSITIONAL_TRACKING_STATE getCurrentGNSSData(SL_GNSSData* data, bool radian);
 
