@@ -405,7 +405,7 @@ void ZEDFusionController::disablePositionalTracking() {
 	fusion.disablePositionalTracking();
 }
 
-void ZEDFusionController::ingestGNSSData(SL_GNSSData* data, bool radian)
+SL_FUSION_ERROR_CODE ZEDFusionController::ingestGNSSData(SL_GNSSData* data, bool radian)
 {
 	sl::GNSSData sdk_gnss;
 	sdk_gnss.setCoordinates(data->latitude, data->longitude, data->altitude, radian);
@@ -419,7 +419,7 @@ void ZEDFusionController::ingestGNSSData(SL_GNSSData* data, bool radian)
 		sdk_gnss.position_covariance[i] = data->position_covariance[i];
 	}
 
-	fusion.ingestGNSSData(sdk_gnss);
+	return (SL_FUSION_ERROR_CODE)fusion.ingestGNSSData(sdk_gnss);
 }
 
 SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getCurrentGNSSData(SL_GNSSData* data, bool radian)

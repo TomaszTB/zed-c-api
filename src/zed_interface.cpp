@@ -1418,11 +1418,11 @@ extern "C" {
         }
     }
 
-    INTERFACE_API void sl_fusion_ingest_gnss_data(struct SL_GNSSData* gnss_data, bool radian)
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_ingest_gnss_data(struct SL_GNSSData* gnss_data, bool radian)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
-            ZEDFusionController::get()->ingestGNSSData(gnss_data, radian);
+            return ZEDFusionController::get()->ingestGNSSData(gnss_data, radian);
         }
     }
 
