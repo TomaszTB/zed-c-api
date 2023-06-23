@@ -308,6 +308,7 @@ SL_PositionalTrackingParameters* ZEDController::getPositionalTrackingParameters(
     c_trackingParams->set_floor_as_origin = trackingParams.set_floor_as_origin;
     c_trackingParams->depth_min_range = trackingParams.depth_min_range;
     c_trackingParams->set_gravity_as_origin = trackingParams.set_gravity_as_origin;
+    c_trackingParams->mode = (SL_POSITIONAL_TRACKING_MODE)trackingParams.mode;
     return c_trackingParams;
 }
 
@@ -338,7 +339,7 @@ void ZEDController::disableTracking(const char *path) {
 }
 
 sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin,
-        bool set_as_static, bool enable_imu_fusion, float depth_min_range, bool set_gravity_as_origin, const char* area_file_path) {
+        bool set_as_static, bool enable_imu_fusion, float depth_min_range, bool set_gravity_as_origin, SL_POSITIONAL_TRACKING_MODE mode, const char* area_file_path) {
     if (!isNull()) {
         sl::PositionalTrackingParameters params;
         sl::Transform motion;
@@ -364,6 +365,7 @@ sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_
         params.enable_imu_fusion = enable_imu_fusion;
         params.depth_min_range = depth_min_range;
         params.set_gravity_as_origin = set_gravity_as_origin;
+        params.mode = (sl::POSITIONAL_TRACKING_MODE)mode;
 
         if (area_file_path != nullptr) {
             if (std::string(area_file_path) != "") {
@@ -1090,6 +1092,7 @@ sl::ERROR_CODE ZEDController::enableSpatialMapping(struct SL_SpatialMappingParam
         params.range_meter = mapping_param.range_meter;
         params.use_chunk_only = mapping_param.use_chunk_only;
 		params.reverse_vertex_order = mapping_param.reverse_vertex_order;
+        params.stability_counter = mapping_param.stability_counter;
 
         if (mapping_param.map_type == SL_SPATIAL_MAP_TYPE_MESH) {
             params.save_texture = mapping_param.save_texture;
@@ -1181,10 +1184,10 @@ sl::ERROR_CODE ZEDController::updateChunks(int* numVertices, int* numTriangles, 
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
-sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertices, int* triangles, float* uvs, unsigned char* texturePtr) {
+sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertices, int* triangles, unsigned char* colors, float* uvs, unsigned char* texturePtr) {
     if (!isNull() && !isTextured) {
         if (isMeshUpdated) {
-            int offsetVertices = 0, offsetTriangles = 0, offsetUvs = 0, startIndexUV = 0;
+            int offsetVertices = 0, offsetTriangles = 0, offsetUvs = 0, startIndexUV = 0, offsetColors = 0;
 
             bool isTextureCalled = areTextureReady && uvs != nullptr && texturePtr != nullptr;
             if (isTextureCalled) {
@@ -1194,8 +1197,11 @@ sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertic
             for (int i = 0; i < std::min(maxSubmesh, int(mesh.chunks.size())); i++) {
                 memcpy(&vertices[offsetVertices], mesh.chunks[i].vertices.data(), sizeof (sl::float3) * int(mesh.chunks[i].vertices.size()));
                 memcpy(&triangles[offsetTriangles], mesh.chunks[i].triangles.data(), sizeof (sl::uint3) * int(mesh.chunks[i].triangles.size()));
+                memcpy(&colors[offsetColors], mesh.chunks[i].colors.data(), sizeof(sl::uchar3) * int(mesh.chunks[i].colors.size()));
+
                 offsetVertices += int(3 * mesh.chunks[i].vertices.size());
                 offsetTriangles += int(3 * mesh.chunks[i].triangles.size());
+                offsetColors += int(3 * mesh.chunks[i].colors.size());
                 if (isTextureCalled) {
                     memcpy(&uvs[offsetUvs], &mesh.uv.data()[startIndexUV], sizeof(sl::float2) * int(mesh.chunks[i].uv.size()));
                     offsetUvs += int(2 * mesh.chunks[i].uv.size());
@@ -1209,10 +1215,10 @@ sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertic
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
-sl::ERROR_CODE ZEDController::retrieveMesh(float* vertices, int* triangles, const int maxSubmesh, float* uvs, unsigned char* texturePtr) {
+sl::ERROR_CODE ZEDController::retrieveMesh(float* vertices, int* triangles, unsigned char* colors, const int maxSubmesh, float* uvs, unsigned char* texturePtr) {
     if (!isNull() && !isTextured) {
         if (isMeshUpdated) {
-            int offsetVertices = 0, offsetTriangles = 0, offsetUvs = 0;
+            int offsetVertices = 0, offsetTriangles = 0, offsetUvs = 0, offsetColors = 0;
 
             bool isTextureCalled = areTextureReady && uvs != nullptr && texturePtr != nullptr;
             cudaGraphicsResource_t pcuImageRes = nullptr;
@@ -1258,8 +1264,11 @@ sl::ERROR_CODE ZEDController::retrieveMesh(float* vertices, int* triangles, cons
                 if (mesh.chunks[i].has_been_updated) {
                     memcpy(&vertices[offsetVertices], mesh.chunks[i].vertices.data(), sizeof (sl::float3) * int(mesh.chunks[i].vertices.size()));
                     memcpy(&triangles[offsetTriangles], mesh.chunks[i].triangles.data(), sizeof (sl::uint3) * int(mesh.chunks[i].triangles.size()));
+                    memcpy(&colors[offsetColors], mesh.chunks[i].colors.data(), sizeof(sl::uchar3) * int(mesh.chunks[i].colors.size()));
                     offsetVertices += int(3 * mesh.chunks[i].vertices.size());
                     offsetTriangles += int(3 * mesh.chunks[i].triangles.size());
+                    offsetColors += int(3 * mesh.chunks[i].colors.size());
+
                     if (isTextureCalled) {
                         memcpy(&uvs[offsetUvs], &mesh.uv.data()[startIndexUV], sizeof (sl::float2) * int(mesh.chunks[i].uv.size()));
                         offsetUvs += int(2 * mesh.chunks[i].uv.size());
@@ -1480,7 +1489,7 @@ sl::ERROR_CODE ZEDController::updateWholeMesh(int* nb_vertices, int* nb_triangle
 
 }
 
-sl::ERROR_CODE ZEDController::retrieveWholeMesh(float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr) {
+sl::ERROR_CODE ZEDController::retrieveWholeMesh(float* vertices, int* triangles, unsigned char* colors, float* uvs, unsigned char* texture_ptr) {
     if (!isNull() && !isTextured) {
         if (isMeshUpdated) {
 
@@ -1493,6 +1502,7 @@ sl::ERROR_CODE ZEDController::retrieveWholeMesh(float* vertices, int* triangles,
             memcpy(&vertices[0] , mesh.vertices.data()  , sizeof(sl::float3) * int(mesh.vertices.size()));
             memcpy(&uvs[0], mesh.uv.data(), sizeof(sl::float2) * int(mesh.uv.size()));
             memcpy(&triangles[0], mesh.triangles.data() , sizeof(sl::uint3)  * int(mesh.triangles.size()));
+            memcpy(&colors[0], mesh.colors.data(), sizeof(sl::uchar3) * int(mesh.colors.size()));
 
             if (areTextureReady && uvs != nullptr && texture_ptr != nullptr) {
                 isTextured = true;
@@ -1948,6 +1958,7 @@ sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_BodyTrackingRuntimePar
         sl::BodyTrackingRuntimeParameters runtime_params;
         runtime_params.detection_confidence_threshold = _bodyruntimeparams->detection_confidence_threshold;
         runtime_params.minimum_keypoints_threshold = _bodyruntimeparams->minimum_keypoints_threshold;
+        runtime_params.skeleton_smoothing = _bodyruntimeparams->skeleton_smoothing;
 
         sl::ERROR_CODE v = zed.retrieveBodies(bodies, runtime_params, instance_id);
         if (v == sl::ERROR_CODE::SUCCESS) 
@@ -2022,7 +2033,7 @@ sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_BodyTrackingRuntimePar
                     data->body_list[count].head_position.y = p.head_position.y;
                     data->body_list[count].head_position.z = p.head_position.z;
 
-                    for (int i = 0; i < std::min((int)p.keypoint.size(), 70); i++)
+                    for (int i = 0; i < p.keypoint.size(); i++)
                     {
                         data->body_list[count].keypoint_2d[i].x = p.keypoint_2d.at(i).x;
                         data->body_list[count].keypoint_2d[i].y = p.keypoint_2d.at(i).y;
@@ -2043,7 +2054,7 @@ sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_BodyTrackingRuntimePar
                     data->body_list[count].global_root_orientation.z = p.global_root_orientation.z;
                     data->body_list[count].global_root_orientation.w = p.global_root_orientation.w;
 
-                    for (int i = 0; i < std::min((int)p.local_orientation_per_joint.size(), 70); i++) { // 38 or 70
+                    for (int i = 0; i < p.local_orientation_per_joint.size(); i++) {
 
                         data->body_list[count].local_orientation_per_joint[i].x = p.local_orientation_per_joint[i].x;
                         data->body_list[count].local_orientation_per_joint[i].y = p.local_orientation_per_joint[i].y;
