@@ -657,7 +657,7 @@ extern "C" {
     INTERFACE_API SL_ERROR_CODE sl_set_camera_settings(int c_id, enum SL_VIDEO_SETTINGS mode, int value) {
         if (!ZEDController::get(c_id)->isNull())
             return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.setCameraSettings((sl::VIDEO_SETTINGS)mode, value);
-        else SL_ERROR_CODE_FAILURE;
+        else return SL_ERROR_CODE_FAILURE;
     }
 
     INTERFACE_API SL_ERROR_CODE sl_set_roi_for_aec_agc(int c_id, enum SL_SIDE side, struct SL_Rect* roi, bool reset) {
@@ -748,7 +748,7 @@ extern "C" {
     INTERFACE_API int sl_enable_positional_tracking(int c_id, SL_PositionalTrackingParameters* tracking_param, const char* area_path) {
         if (!ZEDController::get(c_id)->isNull()) {
             return (int)ZEDController::get(c_id)->enableTracking(&tracking_param->initial_world_rotation, &tracking_param->initial_world_position, tracking_param->enable_area_memory, tracking_param->enable_pose_smothing, tracking_param->set_floor_as_origin,
-                tracking_param->set_as_static, tracking_param->enable_imu_fusion, tracking_param->depth_min_range, tracking_param->set_gravity_as_origin, area_path);
+                tracking_param->set_as_static, tracking_param->enable_imu_fusion, tracking_param->depth_min_range, tracking_param->set_gravity_as_origin, tracking_param->mode, area_path);
         }
         else
             return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
@@ -905,9 +905,9 @@ extern "C" {
             return -1;
     }
 
-    INTERFACE_API int sl_retrieve_mesh(int c_id, float* vertices, int* triangles, float* uvs, unsigned char* texturePtr, const int maxSubmesh) {
+    INTERFACE_API int sl_retrieve_mesh(int c_id, float* vertices, int* triangles, unsigned char* colors, float* uvs, unsigned char* texturePtr, const int maxSubmesh) {
         if (!ZEDController::get(c_id)->isNull())
-            return (int)ZEDController::get(c_id)->retrieveMesh(vertices, triangles, maxSubmesh, uvs, texturePtr);
+            return (int)ZEDController::get(c_id)->retrieveMesh(vertices, triangles, colors, maxSubmesh, uvs, texturePtr);
         else
             return -1;
     }
@@ -919,9 +919,9 @@ extern "C" {
             return -1;
     }
 
-    INTERFACE_API int sl_retrieve_chunks(int c_id, float* vertices, int* triangles, float* uvs, unsigned char* texturePtr, const int maxSubmesh) {
+    INTERFACE_API int sl_retrieve_chunks(int c_id, float* vertices, int* triangles, unsigned char* colors, float* uvs, unsigned char* texturePtr, const int maxSubmesh) {
         if (!ZEDController::get(c_id)->isNull())
-            return (int)ZEDController::get(c_id)->retrieveChunks(maxSubmesh, vertices, triangles, uvs, texturePtr);
+            return (int)ZEDController::get(c_id)->retrieveChunks(maxSubmesh, vertices, triangles, colors, uvs, texturePtr);
         else
             return -1;
     }
@@ -990,9 +990,9 @@ extern "C" {
             return false;
     }
 
-    INTERFACE_API int sl_retrieve_whole_mesh(int c_id, float* vertices, int* triangles, float* uvs, unsigned char* texture_ptr) {
+    INTERFACE_API int sl_retrieve_whole_mesh(int c_id, float* vertices, int* triangles, unsigned char* colors, float* uvs, unsigned char* texture_ptr) {
         if (!ZEDController::get(c_id)->isNull())
-            return (int)ZEDController::get(c_id)->retrieveWholeMesh(vertices, triangles, uvs, texture_ptr);
+            return (int)ZEDController::get(c_id)->retrieveWholeMesh(vertices, triangles, colors, uvs, texture_ptr);
         else
             return false;
     }
@@ -1424,6 +1424,8 @@ extern "C" {
         {
             return ZEDFusionController::get()->ingestGNSSData(gnss_data, radian);
         }
+        else
+            return SL_FUSION_ERROR_CODE_FAILURE;
     }
 
     INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_current_gnss_data(struct SL_GNSSData* data, bool radian)
