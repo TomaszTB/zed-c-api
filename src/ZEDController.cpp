@@ -1200,7 +1200,7 @@ sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertic
                 memcpy(&vertices[offsetVertices], mesh.chunks[i].vertices.data(), sizeof (sl::float3) * int(mesh.chunks[i].vertices.size()));
                 memcpy(&triangles[offsetTriangles], mesh.chunks[i].triangles.data(), sizeof (sl::uint3) * int(mesh.chunks[i].triangles.size()));
                 memcpy(&colors[offsetColors], mesh.chunks[i].colors.data(), sizeof(sl::uchar3) * int(mesh.chunks[i].colors.size()));
-                    
+
                 offsetVertices += int(3 * mesh.chunks[i].vertices.size());
                 offsetTriangles += int(3 * mesh.chunks[i].triangles.size());
                 offsetColors += int(3 * mesh.chunks[i].colors.size());
