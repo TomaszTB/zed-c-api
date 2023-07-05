@@ -86,6 +86,7 @@ int ZEDController::initFromUSB(SL_InitParameters *params, const unsigned int ser
     initParams.optional_opencv_calibration_file = opencv_calib_path;
 	initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
+    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
     return open();
 
 }
@@ -124,6 +125,7 @@ int ZEDController::initFromSVO(SL_InitParameters *params, const char* path_svo, 
     initParams.optional_opencv_calibration_file = opencv_calib_path;
 	initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
+    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
     return open();
 }
 
@@ -161,6 +163,7 @@ int ZEDController::initFromStream(SL_InitParameters *params, const char* ip, int
     initParams.optional_opencv_calibration_file = opencv_calib_path;
 	initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
+    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
     return open();
 }
 
@@ -197,6 +200,7 @@ int ZEDController::initFromGMSL(SL_InitParameters* params, const unsigned int se
     initParams.optional_opencv_calibration_file = opencv_calib_path;
     initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
+    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
     return open();
 
 }
@@ -1172,10 +1176,8 @@ sl::ERROR_CODE ZEDController::updateChunks(int* numVertices, int* numTriangles, 
 				numTriangles[*numUpdatedSubmeshes] = mesh.chunks[i].triangles.size();
 
 				updatedIndices[*numUpdatedSubmeshes] = i;
-				(*numUpdatedSubmeshes)++;
-				
+				(*numUpdatedSubmeshes)++;		
             }
-
             isMeshUpdated = true;
             return v;
         }
@@ -1194,7 +1196,7 @@ sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertic
                 texturePtr = mesh.texture.getPtr<sl::uchar1>(sl::MEM::CPU);
             }
 
-            for (int i = 0; i < std::min(maxSubmesh, int(mesh.chunks.size())); i++) {
+            for (int i = 0; i < std::min(maxSubmesh, int(mesh.chunks.size())); i++) {                
                 memcpy(&vertices[offsetVertices], mesh.chunks[i].vertices.data(), sizeof (sl::float3) * int(mesh.chunks[i].vertices.size()));
                 memcpy(&triangles[offsetTriangles], mesh.chunks[i].triangles.data(), sizeof (sl::uint3) * int(mesh.chunks[i].triangles.size()));
                 memcpy(&colors[offsetColors], mesh.chunks[i].colors.data(), sizeof(sl::uchar3) * int(mesh.chunks[i].colors.size()));
