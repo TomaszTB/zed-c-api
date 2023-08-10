@@ -258,15 +258,16 @@ enum SL_ERROR_CODE {
 /**
 \brief Represents the available resolution defined in the \ref cameraResolution list.
 \note The VGA resolution does not respect the 640*480 standard to better fit the camera sensor (672*376 is used).
+\warning All resolution are not available for every camera. You can find the available resolutions for each camera in <a href="https://www.stereolabs.com/docs/video/camera-controls#selecting-a-resolution">our documentation</a>.
  */
 enum SL_RESOLUTION {
 	SL_RESOLUTION_HD2K, /**< 2208*1242, available framerates: 15 fps.*/
-	SL_RESOLUTION_HD1080, /**< 1920*1080, available framerates: 15, 30 fps.*/
-	SL_RESOLUTION_HD1200, /**< 1920*1200 (x2), available framerates: 30,60 fps. (ZED-X(M) only)*/
+	SL_RESOLUTION_HD1080, /**< 1920*1080, available framerates: 15, 30, 60 fps.*/
+	SL_RESOLUTION_HD1200, /**< 1920*1200, available framerates: 15, 30, 60 fps.*/
 	SL_RESOLUTION_HD720, /**< 1280*720, available framerates: 15, 30, 60 fps.*/
-	SL_RESOLUTION_SVGA, /**< 960*600 (x2), available framerates: 60, 120 fps. (ZED-X(M) only) */
+	SL_RESOLUTION_SVGA, /**< 960*600, available framerates: 15, 30, 60, 120 fps.*/
 	SL_RESOLUTION_VGA, /**< 672*376, available framerates: 15, 30, 60, 100 fps.*/
-	SL_RESOLUTION_AUTO, /**< Select the resolution compatible with camera, on ZEDX HD1200, HD720 otherwise */
+	SL_RESOLUTION_AUTO, /**< Select the resolution compatible with camera, on ZED X HD1200, HD720 otherwise */
 };
 
 /**
@@ -679,9 +680,9 @@ enum SL_AI_MODELS {
 	SL_AI_MODELS_HUMAN_BODY_38_FAST_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
 	SL_AI_MODELS_HUMAN_BODY_38_MEDIUM_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
 	SL_AI_MODELS_HUMAN_BODY_38_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST
-	SL_AI_MODELS_HUMAN_BODY_70_FAST_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST.
-	SL_AI_MODELS_HUMAN_BODY_70_MEDIUM_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_MEDIUM
-	SL_AI_MODELS_HUMAN_BODY_70_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_ACCURATE
+	//SL_AI_MODELS_HUMAN_BODY_70_FAST_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_FAST.
+	//SL_AI_MODELS_HUMAN_BODY_70_MEDIUM_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_MEDIUM
+	//SL_AI_MODELS_HUMAN_BODY_70_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::HUMAN_BODY_ACCURATE
 	SL_AI_MODELS_PERSON_HEAD_DETECTION, // related to sl::DETECTION_MODEL::PERSON_HEAD_BOX
 	SL_AI_MODELS_PERSON_HEAD_ACCURATE_DETECTION, // related to sl::DETECTION_MODEL::PERSON_HEAD_BOX_ACCURATE
 	SL_AI_MODELS_REID_ASSOCIATION, // related to sl::BatchParameters::enable
@@ -956,11 +957,11 @@ enum SL_BODY_70_PARTS
 #endif
 
 /**
-\brief Change the type of outputed position for the Fusion positional tracking (raw data or fusion data projected into zed camera)
+* \brief Change the type of outputted position (raw data or fusion data projected into zed camera).
 */
 enum SL_POSITION_TYPE {
-	SL_POSITION_TYPE_RAW = 0, /*The output position will be the raw position data*/
-	SL_POSITION_TYPE_FUSION, /*The output position will be the fused position projected into the requested camera repository*/
+	SL_POSITION_TYPE_RAW,/**< The output position will be the raw position data. */
+	SL_POSITION_TYPE_FUSION,/**< The output position will be the fused position projected into the requested camera repository. */
 	///@cond SHOWHIDDEN 
 	SL_POSITION_TYPE_LAST
 	///@endcond
@@ -1143,6 +1144,7 @@ struct SL_InitParameters
 	 The default behavior is synchronous, like previous ZED SDK versions
 	 */
 	bool async_grab_camera_recovery;
+
 	/**
 	 Define a computation upper limit to the grab frequency.
 	 This can be useful to get a known constant fixed rate or limit the computation load while keeping a short exposure time by setting a high camera capture framerate.
@@ -1152,7 +1154,6 @@ struct SL_InitParameters
 	 default is 0.
 	 */
 	float grab_compute_capping_fps;
-
 };
 
 /**
@@ -1232,11 +1233,12 @@ struct SL_CameraParameters {
 	float fy; /**< Focal length in pixels along y axis. */
 	float cx; /**< Optical center along x axis, defined in pixels (usually close to width/2). */
 	float cy; /**< Optical center along y axis, defined in pixels (usually close to height/2). */
-	double disto[5]; /**< Distortion factor : [ k1, k2, p1, p2, k3 ]. Radial (k1,k2,k3) and Tangential (p1,p2) distortion.*/
+	double disto[12]; /**< Distortion factor : [ k1, k2, p1, p2, k3 ]. Radial (k1,k2,k3) and Tangential (p1,p2) distortion.*/
 	float v_fov; /**< Vertical field of view, in degrees. */
 	float h_fov; /**< Horizontal field of view, in degrees.*/
 	float d_fov; /**< Diagonal field of view, in degrees.*/
 	struct SL_Resolution image_size; /** size in pixels of the images given by the camera.*/
+	float focal_length_metric; /**< real focal length in millimeters*/
 };
 
 /**
@@ -1415,15 +1417,37 @@ d	\warning: This mode requires more resources to run, but greatly improves track
 	 */
 	float depth_min_range;
 	/**
-	 * @brief This setting allows you to override 2 of the 3 rotations from initial_world_transform using the IMU gravity
+	 * \brief This setting allows you to override 2 of the 3 rotations from initial_world_transform using the IMU gravity
 	 */
 	bool set_gravity_as_origin;
 	/**
-	* @brief Positional tracking mode used. Can be used to improve accuracy in some type of scene at the cost of longer runtime
+	* \brief Positional tracking mode used. Can be used to improve accuracy in some type of scene at the cost of longer runtime
 	* default : POSITIONAL_TRACKING_MODE::STANDARD
 	*/
 	enum SL_POSITIONAL_TRACKING_MODE mode;
 
+};
+
+/**
+	\class PlaneDetectionParameters
+	\brief Sets the plane detection parameters.
+
+	The default constructor sets all parameters to their default settings.
+ */
+
+struct SL_PlaneDetectionParameters {
+
+	/**
+	 \brief controls the spread of plane by checking the position difference.
+	 \n default: 0.15 meters
+	 */
+	float max_distance_threshold;
+
+	/**
+	 \brief controls the spread of plane by checking the angle difference.
+	 \n default: 15 degree
+	 */
+	float normal_similarity_threshold;
 };
 
 /**
@@ -1716,7 +1740,7 @@ struct SL_ObjectDetectionParameters
 	*/
 	enum SL_OBJECT_FILTERING_MODE filtering_mode;
 	/**
-	* @brief When an object is not detected anymore, the SDK will predict its positions during a short period of time before switching its state to SEARCHING.
+	* \brief When an object is not detected anymore, the SDK will predict its positions during a short period of time before switching its state to SEARCHING.
 	* \n It prevents the jittering of the object state when there is a short misdetection. The user can define its own prediction time duration.
 	*
 	* \note During this time, the object will have OK state even if it is not detected.
@@ -1848,7 +1872,7 @@ struct SL_BodyTrackingParameters {
 	struct SL_BatchParameters batch_parameters;
 #endif
 	/**
-	 * @brief When an object is not detected anymore, the SDK will predict its positions during a short period of time before its state switched to SEARCHING.
+	 * \brief When an object is not detected anymore, the SDK will predict its positions during a short period of time before its state switched to SEARCHING.
 	 * \n It prevents the jittering of the object state when there is a short misdetection. The user can define its own prediction time duration.
 	 *
 	 * \note During this time, the object will have OK state even if it is not detected.
@@ -1893,7 +1917,7 @@ struct SL_BodyTrackingRuntimeParameters {
 	 */
 	int minimum_keypoints_threshold;
 	/**
-	 * @brief this value controls the smoothing of the fitted fused skeleton.
+	 * \brief this value controls the smoothing of the fitted fused skeleton.
 	 * it is ranged from 0 (low smoothing) and 1 (high smoothing)
 	 * Default is 0;
 	 */
@@ -2308,33 +2332,41 @@ struct SL_InputType
 /////////////////////////////// FUSION API /////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+\enum SL_FUSION_ERROR_CODE
+\brief Lists the types of error that can be raised by the Fusion.
+*/
 enum SL_FUSION_ERROR_CODE {
-	SL_FUSION_ERROR_CODE_NO_NEW_DATA_AVAILABLE = -10, /** < All data from all sources were consumed, no new process available.*/
-	SL_FUSION_ERROR_CODE_INVALID_TIMESTAMP = -9, /** < Problem was detected with ingested timestamp*/
-	SL_FUSION_ERROR_CODE_INVALID_COVARIANCE = -8, /** < Problem was detected with ingested covariance */
-	SL_FUSION_ERROR_CODE_WRONG_BODY_FORMAT = -7, /**< The requested body tracking model is not available*/
-	SL_FUSION_ERROR_CODE_NOT_ENABLE = -6, /**< The following module was not enabled*/
-	SL_FUSION_ERROR_CODE_INPUT_FEED_MISMATCH = -5, /**< Some source are provided by SVO and some sources are provided by LIVE stream */
-	SL_FUSION_ERROR_CODE_CONNECTION_TIMED_OUT = -4, /**< Connection timed out ... impossible to reach the sender... this may be due to ZedHub absence*/
-	SL_FUSION_ERROR_CODE_MEMORY_ALREADY_USED = -3, /**< Detect multiple instance of SHARED_MEMORY communicator ... only one is authorised*/
-	SL_FUSION_ERROR_CODE_BAD_IP_ADDRESS = -2, /**< The IP format provided is wrong, please provide IP in this format a.b.c.d where (a, b, c, d) are numbers between 0 and 255.*/
-	SL_FUSION_ERROR_CODE_FAILURE = -1, /**< Standard code for unsuccessful behavior.*/
-	SL_FUSION_ERROR_CODE_SUCCESS = 0,
-	SL_FUSION_ERROR_CODE_FUSION_ERRATIC_FPS = 1, /**< Some big differences has been observed between senders FPS*/
-	SL_FUSION_ERROR_CODE_FUSION_FPS_TOO_LOW = 2 /**< At least one sender has fps lower than 10 FPS*/
+	SL_FUSION_ERROR_CODE_WRONG_BODY_FORMAT = -7, /**< Senders are using different body formats. Consider changing them. */
+	SL_FUSION_ERROR_CODE_NOT_ENABLE = -6, /**< The following module was not enabled. */
+	SL_FUSION_ERROR_CODE_INPUT_FEED_MISMATCH = -5, /**< Some sources are provided by SVO and others by LIVE stream. */
+	SL_FUSION_ERROR_CODE_CONNECTION_TIMED_OUT = -4, /**< Connection timed out. Unable to reach the sender. Verify the sender's IP/port. */
+	SL_FUSION_ERROR_CODE_MEMORY_ALREADY_USED = -3, /**< Intra-process shared memory allocation issue. Multiple connections to the same data. */
+	SL_FUSION_ERROR_CODE_BAD_IP_ADDRESS = -2, /**< The provided IP address format is incorrect. Please provide the IP in the format 'a.b.c.d', where (a, b, c, d) are numbers between 0 and 255. */
+	SL_FUSION_ERROR_CODE_FAILURE = -1, /**< Standard code for unsuccessful behavior. */
+	SL_FUSION_ERROR_CODE_SUCCESS = 0, /**< Standard code for successful behavior. */
+	SL_FUSION_ERROR_CODE_FUSION_ERRATIC_FPS = 1, /**< Significant differences observed between sender's FPS. */
+	SL_FUSION_ERROR_CODE_FUSION_FPS_TOO_LOW = 2, /**< At least one sender has an FPS lower than 10 FPS. */
+	SL_FUSION_ERROR_CODE_INVALID_TIMESTAMP = 3, /**< Problem detected with ingested timestamp. Sample data will be ignored. */
+	SL_FUSION_ERROR_CODE_INVALID_COVARIANCE = 4, /**< Problem detected with ingested covariance. Sample data will be ignored. */
+	SL_FUSION_ERROR_CODE_NO_NEW_DATA_AVAILABLE = 5 /**< All data from all sources has been consumed. No new data is available for processing. */
 };
 
+/**
+\enum SL_SENDER_ERROR_CODE
+\brief Lists the types of error that can be raised during the Fusion by senders.
+*/
 enum SL_SENDER_ERROR_CODE {
-	SL_SENDER_ERROR_CODE_DISCONNECTED = -1, /**< the sender has been disconnected*/
-	SL_SENDER_ERROR_CODE_SUCCESS = 0,
-	SL_SENDER_ERROR_CODE_GRAB_ERROR = 1, /**< the sender has encountered an grab error*/
-	SL_SENDER_ERROR_CODE_ERRATIC_FPS = 2, /**< the sender does not run with a constant frame rate*/
-	SL_SENDER_ERROR_CODE_FPS_TOO_LOW = 3 /**< fps lower than 10 FPS*/
+	SL_SENDER_ERROR_CODE_DISCONNECTED = -1, /**< The sender has been disconnected.*/
+	SL_SENDER_ERROR_CODE_SUCCESS = 0, /**< Standard code for successful behavior.*/
+	SL_SENDER_ERROR_CODE_GRAB_ERROR = 1, /**< The sender encountered a grab error.*/
+	SL_SENDER_ERROR_CODE_ERRATIC_FPS = 2, /**< The sender does not run with a constant frame rate.*/
+	SL_SENDER_ERROR_CODE_FPS_TOO_LOW = 3 /**< The frame rate of the sender is lower than 10 FPS.*/
 };
 
 enum SL_COMM_TYPE
 {
-	SL_COMM_TYPE_LOCAL_NETWORK, /* the sender and receiver are on the samed local network and communicate by RTP, communication can be affected by the network load.*/
+	SL_COMM_TYPE_LOCAL_NETWORK, /* the sender and receiver are on the same local network and communicate by RTP, communication can be affected by the network load.*/
 	SL_COMM_TYPE_INTRA_PROCESS /* both sender and receiver are declared by the same process, can be in different threads, this communication is optimized.*/
 };
 
@@ -2345,137 +2377,197 @@ struct  SL_CommunicationParameters
 	char ip_add[128];
 };
 
+/**
+\brief Useful struct to store the Fusion configuration, can be read from /write to a JSON file.
+ */
 struct SL_FusionConfiguration {
+	/**
+	The serial number of the used ZED camera.
+	*/
 	int serial_number;
+
+	/**
+	The communication parameters to connect this camera to the Fusion.
+	*/
 	struct SL_CommunicationParameters comm_param;
+
+	/**
+	The WORLD SL_Vector3 of the camera for Fusion.
+	*/
 	struct SL_Vector3 position;
+
+	/**
+	The WORLD SL_Quaternion of the camera for Fusion.
+	*/
 	struct SL_Quaternion rotation;
+
+	/**
+	The input type for the current camera.
+	*/
 	struct SL_InputType input_type;
 };
 
 
+/**
+\brief Holds the options used to initialize the \ref Fusion object.
+ */
 struct SL_InitFusionParameters
 {
 	/**
-	This parameter allows you to select the unit to be used for all metric values of the SDK. (depth, point cloud, tracking, mesh, and others).
-	\n default : \ref UNIT "UNIT::MILLIMETER"
+	 * \brief This parameter allows you to select the unit to be used for all metric values of the SDK (depth, point cloud, tracking, mesh, and others).
+	 *
+	 *  Default : \ref SL_UNIT "SL_UNIT_MILLIMETER"
 	 */
 	enum SL_UNIT coordinate_units;
 
 	/**
-	Positional tracking, point clouds and many other features require a given \ref COORDINATE_SYSTEM to be used as reference.
-	This parameter allows you to select the \ref COORDINATE_SYSTEM used by the \ref Camera to return its measures.
-	\n This defines the order and the direction of the axis of the coordinate system.
-	\n default : \ref COORDINATE_SYSTEM "COORDINATE_SYSTEM::IMAGE"
+	 * \brief Positional tracking, point clouds and many other features require a given \ref SL_COORDINATE_SYSTEM to be used as reference.
+	 * This parameter allows you to select the \ref COORDINATE_SYSTEM used by the \ref SL_Camera to return its measures.
+	 * 
+	 * This defines the order and the direction of the axis of the coordinate system.
+	 * \n Default : \ref SL_COORDINATE_SYSTEM "SL_COORDINATE_SYSTEM_IMAGE"
 	 */
 	enum SL_COORDINATE_SYSTEM coordinate_system;
 
 	/**
-	 * @brief it allows users to extract some stats of the Fusion API like drop frame of each camera, latency, etc
+	 * \brief It allows users to extract some stats of the Fusion API like drop frame of each camera, latency, etc...
 	 *
 	 */
 	bool output_performance_metrics;
 
+	/**
+	 * \brief Enable the verbosity mode of the SDK.
+	 * 
+	*/
 	bool verbose;
 
 	/**
 	 * @brief If specified change the number of period necessary for a source to go in timeout without data. For example, if you set this to 5
 	 * then, if any source do not receive data during 5 period, these sources will go to timeout and will be ignored.
-	 *
+	 * 
 	 */
 	unsigned int timeout_period_number;
 };
 
 /**
- * 
- *
+\brief Holds the options used to initialize the body tracking module of the \ref Fusion.
  */
-struct SL_PositionalTrackingFusionParameters {
-	/**
-	 * @brief Is the gnss fusion is enabled
-	 *
-	 */
-	bool enable_GNSS_fusion;
-	/**
-	 * @brief Distance necessary for initializing the transformation between cameras coordinate system and  GNSS coordinate system (north aligned)
-	 *
-	 */
-	float gnss_initialisation_distance;
-	/**
-	 * @brief Value used by Fusion for ignoring high covariance input GNSS data
-	 *
-	 */
-	float gnss_ignore_threshold;
-};
-
 struct SL_BodyTrackingFusionParameters
 {
 	/**
-	* \brief Defines if the object detection will track objects across images flow
+	* \brief Defines if the object detection will track objects across images flow.
+	*
+	* Default: true
 	*/
 	bool enable_tracking;
 
 	/**
 	* \brief Defines if the body fitting will be applied
+	*
+	* Default: false
+	* \note If you enable it and the camera provides data as BODY_18 the fused body format will be BODY_34.
 	*/
 	bool enable_body_fitting;
 };
 
+/**
+\brief Holds the options used to change the behavior of the body tracking module at runtime.
+ */
 struct SL_BodyTrackingFusionRuntimeParameters
 {
 	/**
-	* @brief if the fused skeleton has less than skeleton_minimum_allowed_keypoints keypoints, it will be discarded. Default is -1.
-	 *
+	 * \brief If the fused skeleton has less than skeleton_minimum_allowed_keypoints keypoints, it will be discarded.
+	 * 
+	 * Default: -1.
 	 */
 	int skeleton_minimum_allowed_keypoints;
 	/**
-	 * @brief if a skeleton was detected in less than skeleton_minimum_allowed_camera cameras, it will be discarded
+	 * \brief If a skeleton was detected in less than skeleton_minimum_allowed_camera cameras, it will be discarded.
 	 *
+	 * Default: -1.
 	 */
 	int skeleton_minimum_allowed_camera;
 
 	/**
-	 * @brief this value controls the smoothing of the tracked or fitted fused skeleton.
-	 * it is ranged from 0 (low smoothing) and 1 (high smoothing)
+	 * \brief This value controls the smoothing of the tracked or fitted fused skeleton.
+	 * 
+	 * It is ranged from 0 (low smoothing) and 1 (high smoothing).
+	 * \n Default: 0.
 	 */
 	float skeleton_smoothing;
 };
 
+/**
+\brief Used to identify a specific camera in the Fusion API
+ */
 struct SL_CameraIdentifier {
 	unsigned long long int sn;
 };
 
+/**
+\brief Holds the metrics of a sender in the fusion process.
+ */
 struct SL_CameraMetrics
 {
 	struct SL_CameraIdentifier uuid;
 
-	// gives the fps of the received datas
+	/**
+	 * \brief FPS of the received data.
+	 * 
+	 */
 	float received_fps;
 
-	// gives the latency (in second) of the received datas
+	/**
+	 * \brief Latency (in seconds) of the received data.
+	 * 
+	 */
 	float received_latency;
 
-	// gives the latency (in second) after Fusion synchronization
+	/**
+	 * \brief Latency (in seconds) after Fusion synchronization.
+	 * 
+	 */
 	float synced_latency;
 
-	// if no data present is set to false
+	/**
+	 * \brief If no data present is set to false.
+	 * 
+	 */
 	bool is_present;
 
-	// percent of detection par image during the last second in %, a low values means few detections occurs lately
+	/**
+	 * \brief Gives the percent of detection par image during the last second in %, a low value means few detections occurs lately.
+	 * 
+	 */
 	float ratio_detection;
 
-	// percent of detection par image during the last second in %, a low values means few detections occurs lately
+	/**
+	 * \brief Average time difference for the current fused data.
+	 * 
+	 */
 	float delta_ts;
 };
 
+/**
+\brief Holds the metrics of the fusion process.
+ */
 struct SL_FusionMetrics {
-
-	// mean number of camera that provides data during the past second
+	/**
+	 * \brief Mean number of camera that provides data during the past second.
+	 * 
+	 */
 	float mean_camera_fused;
 
-	// mean number of camera that provides data during the past second
+	/**
+	 * \brief Standard deviation of the data timestamp fused, the lower the better.
+	 * 
+	 */
 	float mean_stdev_between_camera;
 
+	/**
+	 * \brief Sender metrics.
+	 * 
+	 */
 	struct SL_CameraMetrics camera_individual_stats[MAX_FUSED_CAMERAS];
 };
 
@@ -2484,55 +2576,317 @@ struct SL_FusionMetrics {
 /////////////////////////////// GNSS API //////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+\brief Current state of GNSS fusion.
+*/
+enum SL_GNSS_CALIBRATION_STATE {
+	SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED = 0, /**< The GNSS/VIO calibration has not been completed yet. Please continue moving the robot while ingesting GNSS data to perform the calibration.*/
+	SL_GNSS_CALIBRATION_STATE_CALIBRATED = 1, /**< The GNSS/VIO calibration is completed.*/
+	SL_GNSS_CALIBRATION_STATE_RE_CALIBRATION_IN_PROGRESS = 2 /**< A GNSS/VIO re-calibration is in progress in the background. Current geo-tracking services may not be entirely accurate.*/
+};
+
+
+/**
+\brief Contains all GNSS data to be used for positional tracking as prior.
+ */
 struct SL_GNSSData
 {
-	// longitude in radian
+	/**
+	 * \brief Longitude in radian.
+	 * 
+	 */
 	double longitude;
-	// latitude in radian
+	/**
+	 * \brief Latitude in radian.
+	 * 
+	 */
 	double latitude;
-	// altitude in meter
+	/**
+	 * \brief Altitude in meters.
+	 * 
+	 */
 	double altitude;
-	// Timestamp
+	/**
+	 * \brief Timestamp of GNSS position, must be aligned with camera time reference.
+	 * 
+	 */
 	unsigned long long ts;
-
+	/**
+	 * \brief Position covariance in meter must be expressed in ENU coordinate system.
+	 * For eph, epv GNSS sensors, set it as follow: {eph*eph, 0, 0, 0, eph*eph, 0, 0, 0, epv*epv}.
+	 *
+	 */
 	double position_covariance[9];
-
+	/**
+	 * \brief Longitude standard deviation.
+	 *
+	 */
 	double longitude_std;
+	/**
+	 * \brief Latitude standard deviation.
+	 *
+	 */
 	double latitude_std;
+	/**
+	 * \brief Altitude standard deviation.
+	 *
+	 */
 	double altitude_std;
 };
 
+/**
+ * \brief Represents a world position in LatLng format.
+ *
+ */
 struct SL_LatLng
 {
+	/**
+	 * \brief Latitude coordinate in radian.
+	 *
+	 */
 	double latitude;
+	/**
+	 * \brief Longitude coordinate in radian.
+	 *
+	 */
 	double longitude;
+	/**
+	 * \brief Altitude coordinate in meters.
+	 *
+	 */
 	double altitude;
 };
 
-
+/**
+ * \brief Holds Geo reference position.
+ *
+ */
 struct SL_GeoPose
 {
+	/**
+	 * The translation defining the pose in ENU.
+	 */
 	struct SL_Vector3 translation;
+	/**
+	 * The rotation defining the pose in ENU.
+	 */
 	struct SL_Quaternion rotation;
+	/**
+	 * The pose covariance in ENU.
+	 */
 	float pose_covariance[36];
+	/**
+	 * The horizontal accuracy.
+	 */
 	double horizontal_accuracy;
+	/**
+	 * The vertical accuracy.
+	*/
 	double vertical_accuracy;
+	/**
+	 * The latitude, longitude, altitude.
+	 */
 	struct SL_LatLng latlng_coordinates;
+	/**
+	 * The heading.
+	 */
 	double heading;
+	/**
+	 * \brief The timestamp of SL_GeoPose.
+	 *
+	 */
+	unsigned long long timestamp;
 };
 
+/**
+ * \brief Represents a world position in ECEF format.
+ *
+ */
 struct SL_ECEF 
 {
+	/**
+	 * \brief x coordinate of SL_ECEF.
+	 *
+	 */
 	double x;
+	/**
+	 * \brief y coordinate of SL_ECEF.
+	 *
+	 */
 	double y;
+	/**
+	 * \brief z coordinate of SL_ECEF.
+	 *
+	 */
 	double z;
 };
+
+/**
+ * \brief Represents a world position in UTM format.
+ *
+ */
 struct SL_UTM
 {
+	/**
+	 * \brief Northing coordinate.
+	 *
+	 */
 	double northing;
+	/**
+	 * \brief Easting coordinate.
+	 *
+	 */
 	double easting;
+	/**
+	 * \brief Gamma coordinate.
+	 *
+	 */
 	double gamma;
+	/**
+	 * \brief UTMZone of the coordinate.
+	 *
+	 */
 	char UTMZone[256];
 };
+
+/**
+ * \brief Holds the options used for calibrating GNSS / VIO.
+*/
+struct SL_GNSSCalibrationParameters {
+	/**
+	 * \brief This parameter defines the target yaw uncertainty at which the calibration process between GNSS and VIO concludes.
+	 * The unit of this parameter is in radian.
+	 * 
+	 * Default: 0.1 radians
+	 */
+	float target_yaw_uncertainty;
+	/**
+	 * @brief When this parameter is enabled (set to true), the calibration process between GNSS and VIO accounts for the uncertainty in the determined translation, thereby facilitating the calibration termination.
+	 * The maximum allowable uncertainty is controlled by the 'target_translation_uncertainty' parameter.
+	 * 
+	 * Default: false
+	 */
+	bool enable_translation_uncertainty_target;
+	/**
+	 * \brief This parameter defines the target translation uncertainty at which the calibration process between GNSS and VIO concludes.
+	 * 
+	 * Default: 10e-2 (10 centimeters)
+	 */
+	float target_translation_uncertainty;
+	/**
+	 * \brief This parameter determines whether reinitialization should be performed between GNSS and VIO fusion when a significant disparity is detected between GNSS data and the current fusion data.
+	 * It becomes particularly crucial during prolonged GNSS signal loss scenarios.
+	 * 
+	 * Default: true
+	 */
+	bool enable_reinitialization;
+	/**
+	 * \brief This parameter determines the threshold for GNSS/VIO reinitialization.
+	 * If the fused position deviates beyond out of the region defined by the product of the GNSS covariance and the gnss_vio_reinit_threshold, a reinitialization will be triggered.
+	 * 
+	 * Default: 5
+	 */
+	float gnss_vio_reinit_threshold;
+	/**
+	 * \brief If this parameter is set to true, the fusion algorithm will used a rough VIO / GNSS calibration at first and then refine it.
+	 * This allow you to quickly get a fused position.
+	 * 
+	 * Default: true
+	 */
+	bool enable_rolling_calibration;
+};
+
+/**
+ * \brief Holds the options used for initializing the positional tracking fusion module.
+ *
+ */
+struct SL_PositionalTrackingFusionParameters {
+	/**
+	 * \brief This attribute is responsible for enabling or not GNSS positional tracking fusion.
+	 *
+	 * Default: false
+	 */
+	bool enable_GNSS_fusion;
+	/**
+	 * \brief Control the VIO / GNSS calibration process.
+	 * 
+	 */
+	struct SL_GNSSCalibrationParameters gnss_calibration_parameters;
+};
+
+#if 0
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////// Spatial Mapping ////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+\class SpatialMappingFusionParameters
+\ingroup Fusion_group
+\brief Sets the spatial mapping parameters.
+
+Instantiating with the default constructor will set all parameters to their default values.
+\n You can customize these values to fit your application, and then save them to a preset to be loaded in future executions.
+
+\note Users can adjust these parameters as they see fit.
+	*/
+struct SL_SpatialMappingFusionParameters
+{
+	/**
+	\brief Spatial mapping resolution in meters. Should fit \ref allowed_resolution.
+	* Default is 0.05f meter.
+	 */
+	float resolution_meter;
+
+	/**
+	\brief Depth range in meters.
+	Can be different from the value set by \ref sl::InitParameters::depth_maximum_distance.
+	\n Set to 0 by default. In this case, the range is computed from resolution_meter
+	and from the current internal parameters to fit your application.
+	 */
+	float range_meter;
+
+	/**
+	\brief Set to false if you want to ensure consistency between the mesh and its inner chunk data.
+	* Set to false by Default.
+	\note Updating the mesh is time-consuming. Setting this to true results in better performance.
+	 */
+	bool use_chunk_only;
+
+	/**
+	\brief The maximum CPU memory (in MB) allocated for the meshing process.
+	* Default is 2048 MB.
+	 */
+	int max_memory_usage;
+
+	/**
+	 * \brief Control the disparity noise (standard deviation) in px. set a very small value (<0.1) if the depth map of the scene is accurate.
+	 * set a big value (>0.5) if the depth map is noisy.
+	 * Default is 0.3f.
+	 */
+	float disparity_std;
+
+	/**
+   \brief Adjust the weighting factor for the current depth during the integration process.
+	By default, the value is set to 1, which results in the complete integration and fusion of the current depth with the previously integrated depth.
+	Setting it to 0 discards all previous data and solely integrates the current depth.
+	*/
+	float decay;
+
+	bool enable_forget_past;
+
+	/**
+	\brief Control the integration rate of the current depth into the mapping process.
+	This parameter controls how many times a stable 3D points should be seen before it is integrated into the spatial mapping.
+	Default value is 0, this will define the stability counter based on the mesh resolution, the higher the resolution, the higher the stability counter.
+	 */
+	int stability_counter;
+	/**
+	\brief The type of spatial map to be created. This dictates the format that will be used for the mapping(e.g. mesh, point cloud). See \ref SPATIAL_MAP_TYPE
+	 * Default value is SL_SPATIAL_MAP_TYPE_MESH
+	 */
+	enum SL_SPATIAL_MAP_TYPE map_type;
+};
+#endif
 
 #endif

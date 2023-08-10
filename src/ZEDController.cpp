@@ -267,6 +267,9 @@ SL_InitParameters* ZEDController::getInitParameters() {
 
     initParams->async_grab_camera_recovery = initParameters.async_grab_camera_recovery;
 
+    initParams->grab_compute_capping_fps = initParameters.grab_compute_capping_fps;
+
+
     return initParams;
 }
 
@@ -760,7 +763,7 @@ SL_PlaneData* ZEDController::findFloorPlane(SL_Quaternion *resetQuaternion, SL_V
     return &currentFloorPlane;
 }
 
-SL_PlaneData* ZEDController::findPlaneAtHit(SL_Vector2 pixels, bool thres) {
+SL_PlaneData* ZEDController::findPlaneAtHit(SL_Vector2 pixels, struct SL_PlaneDetectionParameters* params, bool thres) {
     if (!isNull()) {
         sdk_mutex.lock();
         sl::Transform resetTransform;
@@ -769,7 +772,12 @@ SL_PlaneData* ZEDController::findPlaneAtHit(SL_Vector2 pixels, bool thres) {
         pos.y = (unsigned int) pixels.y;
 
         memset(&currentPlaneAtHitSDK, 0, sizeof (sl::Plane));
-        sl::ERROR_CODE res = zed.findPlaneAtHit(pos, currentPlaneAtHitSDK);
+
+        sl::PlaneDetectionParameters sdk_params;
+        sdk_params.max_distance_threshold = params->max_distance_threshold;
+        sdk_params.normal_similarity_threshold = params->normal_similarity_threshold;
+
+        sl::ERROR_CODE res = zed.findPlaneAtHit(pos, currentPlaneAtHitSDK, sdk_params);
 
         currentPlaneAtHit.error_code = (int) res;
 
@@ -925,13 +933,15 @@ SL_CameraParameters convertCamParameters(sl::CameraParameters input) {
 	output.cy = input.cy;
 	output.fx = input.fx;
 	output.fy = input.fy;
-	memcpy(&output.disto[0], &input.disto[0], sizeof(double) * 5);
+	memcpy(&output.disto[0], &input.disto[0], sizeof(double) * 12);
 
 	output.d_fov = input.d_fov;
 	output.h_fov = input.h_fov;
 	output.v_fov = input.v_fov;
 	output.image_size.height = input.image_size.height;
 	output.image_size.width = input.image_size.width;
+
+    output.focal_length_metric = input.focal_length_metric;
 
 	return output;
 }
@@ -1200,7 +1210,7 @@ sl::ERROR_CODE ZEDController::retrieveChunks(const int maxSubmesh, float* vertic
                 memcpy(&vertices[offsetVertices], mesh.chunks[i].vertices.data(), sizeof (sl::float3) * int(mesh.chunks[i].vertices.size()));
                 memcpy(&triangles[offsetTriangles], mesh.chunks[i].triangles.data(), sizeof (sl::uint3) * int(mesh.chunks[i].triangles.size()));
                 memcpy(&colors[offsetColors], mesh.chunks[i].colors.data(), sizeof(sl::uchar3) * int(mesh.chunks[i].colors.size()));
-
+                    
                 offsetVertices += int(3 * mesh.chunks[i].vertices.size());
                 offsetTriangles += int(3 * mesh.chunks[i].triangles.size());
                 offsetColors += int(3 * mesh.chunks[i].colors.size());
