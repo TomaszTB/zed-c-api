@@ -213,7 +213,7 @@ SL_FUSION_ERROR_CODE ZEDFusionController::retrieveBodies(struct SL_Bodies* data,
 }
 
 
-SL_FUSION_ERROR_CODE ZEDFusionController::getProcessMetrics(SL_FusionMetrics* metrics)
+SL_FUSION_ERROR_CODE ZEDFusionController::getProcessMetrics(struct SL_FusionMetrics* metrics)
 {
 	memset(metrics, 0, sizeof(SL_FusionMetrics));
 	sl::FusionMetrics sdk_metrics;
@@ -253,7 +253,7 @@ SL_FUSION_ERROR_CODE ZEDFusionController::getProcessMetrics(SL_FusionMetrics* me
 	return (SL_FUSION_ERROR_CODE)err;
 }
 
-SL_SENDER_ERROR_CODE ZEDFusionController::getSenderState(SL_CameraIdentifier* uuid)
+SL_SENDER_ERROR_CODE ZEDFusionController::getSenderState(struct SL_CameraIdentifier* uuid)
 {
 	SL_SENDER_ERROR_CODE err = SL_SENDER_ERROR_CODE_DISCONNECTED;
 
@@ -322,7 +322,7 @@ inline SL_InputType getInput(sl::InputType::INPUT_TYPE type, sl::String conf) {
 	return input;
 }
 
-void ZEDFusionController::readFusionConfigFile(char json_config_filename[256], SL_COORDINATE_SYSTEM coord_system, SL_UNIT unit, SL_FusionConfiguration* configs, int& nb_cameras)
+void ZEDFusionController::readFusionConfigFile(char json_config_filename[256], enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration* configs, int& nb_cameras)
 {
 	auto sdk_configs = sl::readFusionConfigurationFile(std::string(json_config_filename), (sl::COORDINATE_SYSTEM)coord_system, (sl::UNIT)unit);
 
@@ -333,6 +333,7 @@ void ZEDFusionController::readFusionConfigFile(char json_config_filename[256], S
 		if (i < MAX_FUSED_CAMERAS)
 		{
 			sl::FusionConfiguration sdk_config = sdk_configs[i];
+
 
 			SL_FusionConfiguration fusion_config;
 			memset(&fusion_config, 0, sizeof(SL_FusionConfiguration));
@@ -361,17 +362,17 @@ void ZEDFusionController::readFusionConfigFile(char json_config_filename[256], S
 	}
 }
 
-SL_FUSION_ERROR_CODE ZEDFusionController::enablePositionalTracking(SL_PositionalTrackingFusionParameters* params)
+SL_FUSION_ERROR_CODE ZEDFusionController::enablePositionalTracking(struct SL_PositionalTrackingFusionParameters* params)
 {	
 	sl::PositionalTrackingFusionParameters sdk_params;
 	sdk_params.enable_GNSS_fusion = params->enable_GNSS_fusion;
-	sdk_params.gnss_ignore_threshold = params->gnss_ignore_threshold;
-	sdk_params.gnss_initialisation_distance = params->gnss_initialisation_distance;
+
+	memcpy(&sdk_params.gnss_calibration_parameters, &params->gnss_calibration_parameters, sizeof(SL_GNSSCalibrationParameters));
 
 	return (SL_FUSION_ERROR_CODE)fusion.enablePositionalTracking(sdk_params);
 }
 
-SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getPosition(SL_PoseData* poseData, enum SL_REFERENCE_FRAME reference_frame, struct SL_CameraIdentifier* uuid, SL_POSITION_TYPE retrieve_type)
+SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getPosition(SL_PoseData* poseData, enum SL_REFERENCE_FRAME reference_frame, struct SL_CameraIdentifier* uuid, enum SL_POSITION_TYPE retrieve_type)
 {
 	sl::CameraIdentifier sdk_uuid;
 	sdk_uuid.sn = uuid->sn;
@@ -405,7 +406,7 @@ void ZEDFusionController::disablePositionalTracking() {
 	fusion.disablePositionalTracking();
 }
 
-SL_FUSION_ERROR_CODE ZEDFusionController::ingestGNSSData(SL_GNSSData* data, bool radian)
+SL_FUSION_ERROR_CODE ZEDFusionController::ingestGNSSData(struct SL_GNSSData* data, bool radian)
 {
 	sl::GNSSData sdk_gnss;
 	sdk_gnss.setCoordinates(data->latitude, data->longitude, data->altitude, radian);
@@ -422,7 +423,7 @@ SL_FUSION_ERROR_CODE ZEDFusionController::ingestGNSSData(SL_GNSSData* data, bool
 	return (SL_FUSION_ERROR_CODE)fusion.ingestGNSSData(sdk_gnss);
 }
 
-SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getCurrentGNSSData(SL_GNSSData* data, bool radian)
+SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getCurrentGNSSData(struct SL_GNSSData* data, bool radian)
 {
 	SL_POSITIONAL_TRACKING_STATE state = SL_POSITIONAL_TRACKING_STATE_OFF;
 
@@ -445,14 +446,14 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getCurrentGNSSData(SL_GNSSData
 	return state;
 }
 
-SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getGeoPose(SL_GeoPose* pose, bool radian)
+enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::getGeoPose(struct SL_GeoPose* pose, bool radian)
 {
-	SL_POSITIONAL_TRACKING_STATE state = SL_POSITIONAL_TRACKING_STATE_OFF;
+	SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
 
 	memset(pose, 0, sizeof(SL_GeoPose));
 
 	sl::GeoPose sdk_pose;
-	state = (SL_POSITIONAL_TRACKING_STATE)fusion.getGeoPose(sdk_pose);
+	state = (SL_GNSS_CALIBRATION_STATE)fusion.getGeoPose(sdk_pose);
 
 	pose->heading = sdk_pose.heading;
 	pose->horizontal_accuracy = sdk_pose.horizontal_accuracy;
@@ -460,6 +461,7 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getGeoPose(SL_GeoPose* pose, b
 	pose->latlng_coordinates.latitude = sdk_pose.latlng_coordinates.getLatitude(radian);
 	pose->latlng_coordinates.longitude = sdk_pose.latlng_coordinates.getLongitude(radian);
 	pose->latlng_coordinates.altitude = sdk_pose.latlng_coordinates.getAltitude();
+	pose->timestamp = sdk_pose.timestamp.getNanoseconds();
 
 	sl::float3 sdk_position = sdk_pose.pose_data.getTranslation();
 	pose->translation.x = sdk_position.x;
@@ -480,9 +482,9 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getGeoPose(SL_GeoPose* pose, b
 	return state;
 }
 
-SL_POSITIONAL_TRACKING_STATE ZEDFusionController::geoToCamera(SL_LatLng* in, SL_PoseData* out, bool radian)
+enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::geoToCamera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian)
 {
-	SL_POSITIONAL_TRACKING_STATE state = SL_POSITIONAL_TRACKING_STATE_OFF;
+	enum SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
 
 	memset(out, 0, sizeof(SL_PoseData));
 
@@ -490,7 +492,7 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::geoToCamera(SL_LatLng* in, SL_
 	latLng.setCoordinates(in->latitude, in->longitude, in->altitude, radian);
 
 	sl::Pose pose;
-	state = (SL_POSITIONAL_TRACKING_STATE)fusion.Geo2Camera(latLng, pose);
+	state = (enum SL_GNSS_CALIBRATION_STATE)fusion.Geo2Camera(latLng, pose);
 	out->pose_confidence = pose.pose_confidence;
 
 	for (int i = 0; i < 36; i++)
@@ -522,9 +524,9 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::geoToCamera(SL_LatLng* in, SL_
 	return state;
 }
 
-SL_POSITIONAL_TRACKING_STATE ZEDFusionController::cameraToGeo(SL_PoseData* in, SL_GeoPose* out, bool radian)
+enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::cameraToGeo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian)
 {
-	SL_POSITIONAL_TRACKING_STATE state = SL_POSITIONAL_TRACKING_STATE_OFF;
+	SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
 
 	memset(out, 0, sizeof(SL_GeoPose));
 
@@ -548,7 +550,7 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::cameraToGeo(SL_PoseData* in, S
 
 	pose.valid = in->valid;
 
-	state = (SL_POSITIONAL_TRACKING_STATE)fusion.Camera2Geo(pose, sdk_pose);
+	state = (SL_GNSS_CALIBRATION_STATE)fusion.Camera2Geo(pose, sdk_pose);
 
 	out->heading = sdk_pose.heading;
 	out->horizontal_accuracy = sdk_pose.horizontal_accuracy;
@@ -574,4 +576,33 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::cameraToGeo(SL_PoseData* in, S
 	}
 
 	return state;
+}
+
+enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std)
+{
+	SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+	sl::float3 sdk_position_std;
+	state = (SL_GNSS_CALIBRATION_STATE)fusion.getCurrentGNSSCalibrationSTD(*yaw_std, sdk_position_std);
+
+	position_std->x = sdk_position_std.x;
+	position_std->y = sdk_position_std.y;
+	position_std->z = sdk_position_std.z;
+
+	return state;
+}
+
+void ZEDFusionController::getGeoTrackingCalibration(struct SL_Vector3* translation, struct SL_Quaternion* rotation)
+{
+	sl::Transform transform = fusion.getGeoTrackingCalibration();
+
+	sl::float3 sdk_position = transform.getTranslation();
+	translation->x = sdk_position.x;
+	translation->y = sdk_position.y;
+	translation->z = sdk_position.z;
+
+	sl::float4 sdk_rotation = transform.getOrientation();
+	rotation->x = sdk_rotation.x;
+	rotation->y = sdk_rotation.y;
+	rotation->z = sdk_rotation.z;
+	rotation->w = sdk_rotation.w;
 }

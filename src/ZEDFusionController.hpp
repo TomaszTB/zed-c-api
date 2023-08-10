@@ -38,15 +38,15 @@ public:
 
 	void close();
 
-    SL_FUSION_ERROR_CODE process();
+    enum SL_FUSION_ERROR_CODE process();
 
-    SL_FUSION_ERROR_CODE subscribe(struct SL_CameraIdentifier* uuid, struct SL_CommunicationParameters* params, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
+    enum SL_FUSION_ERROR_CODE subscribe(struct SL_CameraIdentifier* uuid, struct SL_CommunicationParameters* params, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
 
-    SL_FUSION_ERROR_CODE updatePose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
+    enum SL_FUSION_ERROR_CODE updatePose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
     
-    SL_SENDER_ERROR_CODE getSenderState(SL_CameraIdentifier* uuid);
+    enum SL_SENDER_ERROR_CODE getSenderState(struct SL_CameraIdentifier* uuid);
 
-    void readFusionConfigFile(char json_config_filename[256], SL_COORDINATE_SYSTEM coord_system, SL_UNIT unit, SL_FusionConfiguration* configs,int& nb_cameras);
+    void readFusionConfigFile(char json_config_filename[256], enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration* configs,int& nb_cameras);
 
     /////////////////////////////////////////////////////////////////////
     ///////////////////// Object Detection Fusion ///////////////////////
@@ -57,14 +57,14 @@ public:
     /// \param [in] init parameters
     /// \return SL_FUSION_ERROR_CODE
     ///
-    SL_FUSION_ERROR_CODE init(struct SL_InitFusionParameters* init_parameters);
+    enum SL_FUSION_ERROR_CODE init(struct SL_InitFusionParameters* init_parameters);
 
     ///
     /// \brief enables body tracking fusion module
     /// \param [in] parameters defined by \ref SL_BodyTrackingFusionParameters
     /// \return SL_FUSION_ERROR_CODE
     ///
-    SL_FUSION_ERROR_CODE enableBodyTracking(struct SL_BodyTrackingFusionParameters* params);
+    enum SL_FUSION_ERROR_CODE enableBodyTracking(struct SL_BodyTrackingFusionParameters* params);
 
     /**
      * \brief get the stats of a given camera in the Fusion API side
@@ -72,7 +72,7 @@ public:
      * \param metrics : structure containing all the metrics available
      * \return SL_FUSION_ERROR_CODE
      */
-    SL_FUSION_ERROR_CODE getProcessMetrics(SL_FusionMetrics* metrics);
+    enum SL_FUSION_ERROR_CODE getProcessMetrics(struct SL_FusionMetrics* metrics);
 
     ///
     /// \brief disable Object detection fusion module
@@ -86,7 +86,7 @@ public:
     /// \param [out] bodies: list of objects seen by all available cameras
     /// \note Only the 3d informations is available in the returned object.
     ///
-    SL_FUSION_ERROR_CODE retrieveBodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid);
+    enum SL_FUSION_ERROR_CODE retrieveBodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid);
 
     /////////////////////////////////////////////////////////////////////
     ///////////////////// Positional Tracking Fusion ///////////////////////
@@ -99,7 +99,7 @@ public:
     *
     * \return ERROR_CODE
     */
-    SL_FUSION_ERROR_CODE enablePositionalTracking(SL_PositionalTrackingFusionParameters* params);
+    enum SL_FUSION_ERROR_CODE enablePositionalTracking(struct SL_PositionalTrackingFusionParameters* params);
 
     /**
      * \brief Get the Fused Position of the camera system
@@ -109,7 +109,7 @@ public:
      * \param uuid Camera identifier
      * \return POSITIONAL_TRACKING_STATE is the current state of the tracking process
      */
-    SL_POSITIONAL_TRACKING_STATE getPosition(SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame, struct SL_CameraIdentifier* uuid, SL_POSITION_TYPE retrieve_type);
+    enum SL_POSITIONAL_TRACKING_STATE getPosition(struct SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame, struct SL_CameraIdentifier* uuid, enum SL_POSITION_TYPE retrieve_type);
 
     ///
     /// \brief disable Positional Tracking fusion module
@@ -118,15 +118,19 @@ public:
     void disablePositionalTracking();
 
 
-    SL_FUSION_ERROR_CODE ingestGNSSData(SL_GNSSData* data, bool radian);
+    enum SL_FUSION_ERROR_CODE ingestGNSSData(struct SL_GNSSData* data, bool radian);
 
-    SL_POSITIONAL_TRACKING_STATE getCurrentGNSSData(SL_GNSSData* data, bool radian);
+    enum SL_POSITIONAL_TRACKING_STATE getCurrentGNSSData(struct SL_GNSSData* data, bool radian);
 
-    SL_POSITIONAL_TRACKING_STATE getGeoPose(SL_GeoPose* pose, bool radian);
+    enum SL_GNSS_CALIBRATION_STATE getGeoPose(struct SL_GeoPose* pose, bool radian);
 
-    SL_POSITIONAL_TRACKING_STATE geoToCamera(SL_LatLng* in, SL_PoseData* out, bool radian);
+    enum SL_GNSS_CALIBRATION_STATE geoToCamera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian);
 
-    SL_POSITIONAL_TRACKING_STATE cameraToGeo(SL_PoseData* in, SL_GeoPose* out, bool radian);
+    enum SL_GNSS_CALIBRATION_STATE cameraToGeo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian);
+
+    enum SL_GNSS_CALIBRATION_STATE getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std);
+
+    void getGeoTrackingCalibration(struct SL_Vector3* translation, struct SL_Quaternion* rotation);
 
 	void destroy();
 

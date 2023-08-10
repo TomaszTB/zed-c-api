@@ -1030,9 +1030,9 @@ extern "C" {
         return nullptr;
     }
 
-    INTERFACE_API SL_PlaneData* sl_find_plane_at_hit(int c_id, SL_Vector2 pixel, bool refine) {
+    INTERFACE_API SL_PlaneData* sl_find_plane_at_hit(int c_id, SL_Vector2 pixel, struct SL_PlaneDetectionParameters* params, bool refine) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return ZEDController::get(c_id)->findPlaneAtHit(pixel, refine);
+            return ZEDController::get(c_id)->findPlaneAtHit(pixel, params, refine);
         }
         return nullptr;
     }
@@ -1396,7 +1396,7 @@ extern "C" {
         }
     }
 
-    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_position(SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame, enum SL_COORDINATE_SYSTEM coordinate_system, enum SL_UNIT unit,
+    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_position(SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame, enum SL_UNIT unit,
         struct SL_CameraIdentifier* uuid, enum SL_POSITION_TYPE retrieve_type)
     {
         if (!ZEDFusionController::get()->isNotCreated())
@@ -1440,7 +1440,7 @@ extern "C" {
         }
     }
 
-    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_geo_pose(SL_GeoPose* pose, bool radian)
+    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_get_geo_pose(SL_GeoPose* pose, bool radian)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
@@ -1448,11 +1448,11 @@ extern "C" {
         }
         else
         {
-            return SL_POSITIONAL_TRACKING_STATE_OFF;
+            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
         }
     }
 
-    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_geo_to_camera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian)
+    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_geo_to_camera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
@@ -1460,11 +1460,11 @@ extern "C" {
         }
         else
         {
-            return SL_POSITIONAL_TRACKING_STATE_OFF;
+            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
         }
     }
 
-    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_camera_to_geo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian)
+    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_camera_to_geo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
@@ -1472,7 +1472,40 @@ extern "C" {
         }
         else
         {
-            return SL_POSITIONAL_TRACKING_STATE_OFF;
+            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+        }
+    }
+
+    INTERFACE_API unsigned long long sl_fusion_get_current_timestamp()
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            return ZEDFusionController::get()->fusion.getCurrentTimeStamp().getNanoseconds();
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_get_current_gnss_calibration_std(float* yaw_std, struct SL_Vector3* position_std)
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            return ZEDFusionController::get()->getCurrentGNSSCalibrationSTD(yaw_std, position_std);
+        }
+        else
+        {
+            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+        }
+    }
+
+
+    INTERFACE_API void sl_fusion_get_geo_tracking_calibration(struct SL_Vector3* translation, struct SL_Quaternion* rotation)
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            return ZEDFusionController::get()->getGeoTrackingCalibration(translation, rotation);
         }
     }
 

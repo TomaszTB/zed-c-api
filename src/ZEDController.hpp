@@ -140,7 +140,7 @@ public:
      ******* Plane Detection *********
      *************************************/
     SL_PlaneData* findFloorPlane(SL_Quaternion *resetQuaternion, SL_Vector3* resetTranslation, SL_Quaternion priorQuaternion, SL_Vector3 priorTranslation);
-    SL_PlaneData* findPlaneAtHit(SL_Vector2 pixel, bool thres);
+    SL_PlaneData* findPlaneAtHit(SL_Vector2 pixel, struct SL_PlaneDetectionParameters* params, bool thres);
     sl::ERROR_CODE convertCurrentFloorPlaneToChunk(float* vertices, int* triangles, int* numVerticesTot, int* numTrianglesTot);
     sl::ERROR_CODE convertCurrentHitPlaneToChunk(float* vertices, int* triangles, int* numVerticesTot, int* numTrianglesTot);
 
