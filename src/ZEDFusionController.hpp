@@ -38,14 +38,48 @@ public:
 
 	void close();
 
+    /**
+     * \brief Runs the main function of the Fusion, this trigger the retrieve and synchronization of all connected senders and updates the enabled modules.
+     * \return \ref FUSION_ERROR_CODE "SUCCESS" if it goes as it should, otherwise it returns an FUSION_ERROR_CODE.
+     */
     enum SL_FUSION_ERROR_CODE process();
 
+    /**
+     * \brief Set the specified camera as a data provider.
+     * \param uuid: The requested camera identifier.
+     * \param params: The communication parameters to connect to the camera.
+     * \param pose_translation: The World translation of the camera, regarding the other camera of the setup.
+     * \param pose_rotation: The World rotation of the camera, regarding the other camera of the setup.
+     * \return \ref FUSION_ERROR_CODE "SUCCESS" if it goes as it should, otherwise it returns an FUSION_ERROR_CODE.
+     */
     enum SL_FUSION_ERROR_CODE subscribe(struct SL_CameraIdentifier* uuid, struct SL_CommunicationParameters* params, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
 
+    enum SL_FUSION_ERROR_CODE unsubscribe(struct SL_CameraIdentifier* uuid);
+
+    /**
+     * \brief Updates the specified camera position inside fusion WORLD.
+     * \param uuid: The requested camera identifier.
+     * \param pose_translation: The World translation of the camera, regarding the other camera of the setup.
+     * \param pose_rotation: The World rotation of the camera, regarding the other camera of the setup.
+     * \return \ref FUSION_ERROR_CODE "SUCCESS" if it goes as it should, otherwise it returns an FUSION_ERROR_CODE.
+     */
     enum SL_FUSION_ERROR_CODE updatePose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
     
+    /**
+     * \brief Returns the state of each connected data senders.
+     * \return The individual state of each connected senders.
+     */
     enum SL_SENDER_ERROR_CODE getSenderState(struct SL_CameraIdentifier* uuid);
 
+    /**
+    \brief Read a Configuration JSON file to configure a fusion process.
+    \param json_config_filename : The name of the JSON file containing the configuration.
+    \param coord_system : The COORDINATE_SYSTEM in which you want the World Pose to be in.
+    \param unit : The UNIT in which you want the World Pose to be in.
+    \param configs An array of SL_FusionConfiguration for all the camera present in the file.
+    \param nb_cameras the size of the aray of SL_FusionConfiguration
+    \note Empty if no data were found for the requested camera.
+     */
     void readFusionConfigFile(char json_config_filename[256], enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration* configs,int& nb_cameras);
 
     /////////////////////////////////////////////////////////////////////
@@ -113,7 +147,6 @@ public:
 
     ///
     /// \brief disable Positional Tracking fusion module
-    /// \return
     ///
     void disablePositionalTracking();
 
