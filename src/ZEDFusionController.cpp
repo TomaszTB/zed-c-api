@@ -68,6 +68,14 @@ SL_FUSION_ERROR_CODE ZEDFusionController::subscribe(struct SL_CameraIdentifier* 
 	return (SL_FUSION_ERROR_CODE)fusion.subscribe(sl_uuid, comm_params, pose);
 }
 
+enum SL_FUSION_ERROR_CODE ZEDFusionController::unsubscribe(struct SL_CameraIdentifier* uuid)
+{
+	sl::CameraIdentifier sl_uuid;
+	sl_uuid.sn = uuid->sn;
+
+	return (SL_FUSION_ERROR_CODE)fusion.unsubscribe(sl_uuid);
+}
+
 SL_FUSION_ERROR_CODE ZEDFusionController::updatePose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation)
 {
 	sl::CameraIdentifier sl_uuid;

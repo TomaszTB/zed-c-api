@@ -96,6 +96,8 @@ public:
     sl::ERROR_CODE getIMUOrientation(SL_Quaternion *quaternion, int time_reference);
     sl::ERROR_CODE getSensorsData(SL_SensorsData *sensorData, int time_reference);
 
+    sl::ERROR_CODE startRegionOfInterestAutoDetection(SL_RegionOfInterestParameters* roi_params);
+
     /***********Spatial mapping *********/
     sl::ERROR_CODE enableSpatialMapping(struct SL_SpatialMappingParameters mapping_param);
     void requestMeshAsync();

@@ -317,19 +317,34 @@ extern "C" {
         return  ZEDController::get(c_id)->zed.isOpened();
     }
 
-    INTERFACE_API void sl_start_publishing(int c_id, struct SL_CommunicationParameters* params)
+    INTERFACE_API enum SL_ERROR_CODE sl_start_publishing(int c_id, struct SL_CommunicationParameters* params)
     {
-        sl::CommunicationParameters comm_params;
-        if (params->communication_type == SL_COMM_TYPE_INTRA_PROCESS)
+        if (!ZEDController::get(c_id)->isNull())
         {
-            comm_params.setForSharedMemory();
-        }
-        else // NETWORK
-        {
-            comm_params.setForLocalNetwork(std::string(params->ip_add), params->ip_port);
+            sl::CommunicationParameters comm_params;
+            if (params->communication_type == SL_COMM_TYPE_INTRA_PROCESS)
+            {
+                comm_params.setForSharedMemory();
+            }
+            else // NETWORK
+            {
+                comm_params.setForLocalNetwork(std::string(params->ip_add), params->ip_port);
+            }
+
+            return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.startPublishing(comm_params);
         }
 
-        ZEDController::get(c_id)->zed.startPublishing(comm_params);
+        return SL_ERROR_CODE_FAILURE;
+    }
+
+    INTERFACE_API enum SL_ERROR_CODE sl_stop_publishing(int c_id)
+    {
+        if (!ZEDController::get(c_id)->isNull()) 
+        {
+            return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.startPublishing();
+        }
+
+        return SL_ERROR_CODE_FAILURE;
     }
 
     INTERFACE_API int sl_set_region_of_interest(int c_id, void* ptr) {
@@ -338,6 +353,33 @@ extern "C" {
         }
         else
             return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+    }
+
+    INTERFACE_API int sl_get_region_of_interest(int c_id, void* ptr, int width, int height)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return (int)ZEDController::get(c_id)->zed.getRegionOfInterest(*MAT, sl::Resolution(width, height));
+        }
+        else
+            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+    }
+
+    INTERFACE_API int sl_start_region_of_interest_auto_detection(int c_id, struct SL_RegionOfInterestParameters* roi_param)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return (int)ZEDController::get(c_id)->startRegionOfInterestAutoDetection(roi_param);
+        }
+        else
+            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+    }
+
+    INTERFACE_API enum SL_REGION_OF_INTEREST_AUTO_DETECTION_STATE sl_get_region_of_interest_auto_detection_status(int c_id)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return (enum SL_REGION_OF_INTEREST_AUTO_DETECTION_STATE)ZEDController::get(c_id)->zed.getRegionOfInterestAutoDetectionStatus();
+        }
+        else
+            return SL_REGION_OF_INTEREST_AUTO_DETECTION_STATE_NOT_ENABLED;
     }
 
     INTERFACE_API CUcontext sl_get_cuda_context(int c_id)
@@ -552,6 +594,14 @@ extern "C" {
         return -1;
     }
 
+    INTERFACE_API int sl_get_svo_position_at_timestamp(int c_id, unsigned long long timestamp)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return ZEDController::get(c_id)->zed.getSVOPositionAtTimestamp(sl::Timestamp(timestamp));
+        }
+        return -1;
+    }
+
     INTERFACE_API int sl_get_svo_number_of_frames(int c_id) {
         if (!ZEDController::get(c_id)->isNull()) {
             return ZEDController::get(c_id)->zed.getSVONumberOfFrames();
@@ -654,9 +704,22 @@ extern "C" {
             return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
 
+    INTERFACE_API bool sl_is_camera_setting_supported(int c_id, enum SL_VIDEO_SETTINGS setting)
+    {
+        if (!ZEDController::get(c_id)->isNull())
+            return ZEDController::get(c_id)->zed.isCameraSettingSupported((sl::VIDEO_SETTINGS)setting);
+        else return false;
+    }
+
     INTERFACE_API SL_ERROR_CODE sl_set_camera_settings(int c_id, enum SL_VIDEO_SETTINGS mode, int value) {
         if (!ZEDController::get(c_id)->isNull())
             return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.setCameraSettings((sl::VIDEO_SETTINGS)mode, value);
+        else return SL_ERROR_CODE_FAILURE;
+    }
+    
+    INTERFACE_API SL_ERROR_CODE sl_set_camera_settings_min_max(int c_id, enum SL_VIDEO_SETTINGS mode, int min, int max) {
+        if (!ZEDController::get(c_id)->isNull())
+            return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.setCameraSettings((sl::VIDEO_SETTINGS)mode, min, max);
         else return SL_ERROR_CODE_FAILURE;
     }
 
@@ -673,6 +736,15 @@ extern "C" {
         if (!ZEDController::get(c_id)->isNull())
         {
             return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.getCameraSettings((sl::VIDEO_SETTINGS)mode, *value);
+        }
+        else
+            return (SL_ERROR_CODE)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+    }
+
+    INTERFACE_API SL_ERROR_CODE sl_get_camera_settings_min_max(int c_id, enum SL_VIDEO_SETTINGS mode, int* minvalue, int* maxvalue) {
+        if (!ZEDController::get(c_id)->isNull())
+        {
+            return (SL_ERROR_CODE)ZEDController::get(c_id)->zed.getCameraSettings((sl::VIDEO_SETTINGS)mode, *minvalue, *maxvalue);
         }
         else
             return (SL_ERROR_CODE)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
@@ -1300,6 +1372,46 @@ extern "C" {
         if (!ZEDFusionController::get()->isNotCreated())
         {
             return ZEDFusionController::get()->subscribe(uuid, params, pose_translation, pose_rotation);
+        }
+        else
+        {
+            return SL_FUSION_ERROR_CODE_FAILURE;
+        }
+    }
+
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_unsubscribe(struct SL_CameraIdentifier* uuid)
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            return ZEDFusionController::get()->unsubscribe(uuid);
+        }
+        else
+        {
+            return SL_FUSION_ERROR_CODE_FAILURE;
+        }
+    }
+    
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_retrieve_image(void* ptr, struct SL_CameraIdentifier* uuid, int width, int height)
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            sl::CameraIdentifier sl_uuid;
+            sl_uuid.sn = uuid->sn;
+            return (SL_FUSION_ERROR_CODE)ZEDFusionController::get()->fusion.retrieveImage(*MAT, sl_uuid, sl::Resolution(width, height));
+        }
+        else
+        {
+            return SL_FUSION_ERROR_CODE_FAILURE;
+        }
+    }
+
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_retrieve_measure(void* ptr, struct SL_CameraIdentifier* uuid, enum SL_MEASURE measure, int width, int height)
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            sl::CameraIdentifier sl_uuid;
+            sl_uuid.sn = uuid->sn;
+            return (SL_FUSION_ERROR_CODE)ZEDFusionController::get()->fusion.retrieveMeasure(*MAT, sl_uuid, (sl::MEASURE)measure, sl::Resolution(width, height));
         }
         else
         {

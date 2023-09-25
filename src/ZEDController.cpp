@@ -87,6 +87,7 @@ int ZEDController::initFromUSB(SL_InitParameters *params, const unsigned int ser
 	initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
     initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
+    initParams.enable_image_validity_check = params->enable_image_validity_check;
     return open();
 
 }
@@ -126,6 +127,7 @@ int ZEDController::initFromSVO(SL_InitParameters *params, const char* path_svo, 
 	initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
     initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
+    initParams.enable_image_validity_check = params->enable_image_validity_check;
     return open();
 }
 
@@ -164,6 +166,8 @@ int ZEDController::initFromStream(SL_InitParameters *params, const char* ip, int
 	initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
     initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
+    initParams.enable_image_validity_check = params->enable_image_validity_check;
+
     return open();
 }
 
@@ -201,6 +205,8 @@ int ZEDController::initFromGMSL(SL_InitParameters* params, const unsigned int se
     initParams.open_timeout_sec = params->open_timeout_sec;
     initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
     initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
+    initParams.enable_image_validity_check = params->enable_image_validity_check;
+
     return open();
 
 }
@@ -269,6 +275,7 @@ SL_InitParameters* ZEDController::getInitParameters() {
 
     initParams->grab_compute_capping_fps = initParameters.grab_compute_capping_fps;
 
+    initParams->enable_image_validity_check = initParameters.enable_image_validity_check;
 
     return initParams;
 }
@@ -698,6 +705,22 @@ SL_RecordingStatus* ZEDController::getRecordingStatus() {
 	else
 		return nullptr;
 }
+
+sl::ERROR_CODE ZEDController::startRegionOfInterestAutoDetection(SL_RegionOfInterestParameters* roi_params)
+{
+    sl::ERROR_CODE err = sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+    if (!isNull()) 
+    {
+        sl::RegionOfInterestParameters sdk_params;
+        sdk_params.auto_apply = roi_params->auto_apply;
+        sdk_params.depth_far_threshold_meters = roi_params->depth_far_threshold_meters;
+        sdk_params.image_height_ratio_cutoff = roi_params->image_height_ratio_cutoff;
+
+        err = zed.startRegionOfInterestAutoDetection(sdk_params);
+    }
+    return err;
+}
+
 
 SL_PlaneData* ZEDController::findFloorPlane(SL_Quaternion *resetQuaternion, SL_Vector3* resetTranslation, SL_Quaternion priorQuaternion, SL_Vector3 priorTranslation) {
     if (!isNull()) {
