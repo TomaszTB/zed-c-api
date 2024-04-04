@@ -347,18 +347,18 @@ extern "C" {
         return SL_ERROR_CODE_FAILURE;
     }
 
-    INTERFACE_API int sl_set_region_of_interest(int c_id, void* ptr) {
+    INTERFACE_API int sl_set_region_of_interest(int c_id, void* ptr, bool module[SL_MODULE_LAST]) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->zed.setRegionOfInterest(*MAT);
+            return (int)ZEDController::get(c_id)->setRegionOfInterest(*MAT, module);
         }
         else
             return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
 
-    INTERFACE_API int sl_get_region_of_interest(int c_id, void* ptr, int width, int height)
+    INTERFACE_API int sl_get_region_of_interest(int c_id, void* ptr, int width, int height, enum SL_MODULE module)
     {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->zed.getRegionOfInterest(*MAT, sl::Resolution(width, height));
+            return (int)ZEDController::get(c_id)->getRegionOfInterest(*MAT, sl::Resolution(width, height), module);
         }
         else
             return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
@@ -509,6 +509,7 @@ extern "C" {
                 device.id = devices[i].id;
                 device.sn = devices[i].serial_number;
                 device.input_type = (SL_INPUT_TYPE)devices[i].input_type;
+                memcpy(device.path, devices[i].path, 512 * sizeof(char));
                 device_list[i] = device;
             }
         }
@@ -574,6 +575,49 @@ extern "C" {
     INTERFACE_API void sl_pause_recording(int c_id, bool status) {
         if (!ZEDController::get(c_id)->isNull()) {
             ZEDController::get(c_id)->zed.pauseRecording(status);
+        }
+    }
+
+    INTERFACE_API enum SL_ERROR_CODE sl_ingest_data_into_svo(int c_id, struct SL_SVOData* data)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return (SL_ERROR_CODE)ZEDController::get(c_id)->ingestDataIntoSVO(data);
+        }
+        else
+            return SL_ERROR_CODE_CAMERA_NOT_INITIALIZED;
+    }
+
+    INTERFACE_API int sl_get_svo_data_size(int c_id, char key[128], unsigned long long ts_begin, unsigned long long ts_end)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return ZEDController::get(c_id)->getSVODataSize(key, ts_begin, ts_end);
+        }
+        else
+            return -1;
+    }
+
+    INTERFACE_API enum SL_ERROR_CODE sl_retrieve_svo_data(int c_id, char key[128], int nb_data, struct SL_SVOData* data, unsigned long long ts_begin, unsigned long long ts_end)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return (SL_ERROR_CODE)ZEDController::get(c_id)->retrieveSVOData(key, nb_data, data, ts_begin, ts_end);
+        }
+        else
+            return SL_ERROR_CODE_CAMERA_NOT_INITIALIZED;
+    }
+
+    INTERFACE_API int sl_get_svo_data_keys_size(int c_id)
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return ZEDController::get(c_id)->getSVODataKeysSize();
+        }
+        else
+            return -1;
+    }
+
+    INTERFACE_API void sl_get_svo_data_keys(int c_id, int nb_keys, char* keys[128])
+    {
+        if (!ZEDController::get(c_id)->isNull()) {
+            ZEDController::get(c_id)->getSVODataKeys(nb_keys, keys);
         }
     }
 
@@ -701,7 +745,7 @@ extern "C" {
         if (!ZEDController::get(c_id)->isNull())
             return ZEDController::get(c_id)->zed.getTimestamp(sl::TIME_REFERENCE::CURRENT);
         else
-            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+            return 0ULL;
     }
 
     INTERFACE_API bool sl_is_camera_setting_supported(int c_id, enum SL_VIDEO_SETTINGS setting)
@@ -772,14 +816,14 @@ extern "C" {
         if (!ZEDController::get(c_id)->isNull())
             return ZEDController::get(c_id)->zed.getInitParameters().depth_minimum_distance;
         else
-            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+            return -1;
     }
 
     INTERFACE_API float sl_get_depth_max_range_value(int c_id) {
         if (!ZEDController::get(c_id)->isNull())
             return ZEDController::get(c_id)->zed.getInitParameters().depth_maximum_distance;
         else
-            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+            return -1;
     }
 
     INTERFACE_API int sl_get_current_min_max_depth(int c_id, float* min, float* max)
@@ -787,14 +831,14 @@ extern "C" {
         if (!ZEDController::get(c_id)->isNull())
             return (int)ZEDController::get(c_id)->zed.getCurrentMinMaxDepth(*min, *max);
         else
-            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+            return 1; //SL_ERROR_CODE_FAILURE
     }
 
     INTERFACE_API int sl_get_confidence_threshold(int c_id) {
         if (!ZEDController::get(c_id)->isNull())
             return (int)ZEDController::get(c_id)->zed.getRuntimeParameters().confidence_threshold;
         else
-            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+            return -1;
     }
 
 
@@ -823,7 +867,7 @@ extern "C" {
                 tracking_param->set_as_static, tracking_param->enable_imu_fusion, tracking_param->depth_min_range, tracking_param->set_gravity_as_origin, tracking_param->mode, area_path);
         }
         else
-            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+            return (int)SL_ERROR_CODE_CAMERA_NOT_INITIALIZED;
     }
 
     INTERFACE_API int sl_get_area_export_state(int c_id) {
@@ -864,6 +908,14 @@ extern "C" {
             return (int)ZEDController::get(c_id)->getPoseArray(pose, (int)mat_type);
         else
             return (int)sl::POSITIONAL_TRACKING_STATE::OFF;
+    }
+
+    INTERFACE_API struct SL_PositionalTrackingStatus* sl_get_positional_tracking_status(int c_id)
+    {
+        if (!ZEDController::get(c_id)->isNull())
+            return ZEDController::get(c_id)->getPositionalTrackingStatus();
+        else
+            return nullptr;
     }
 
     INTERFACE_API int sl_get_position_at_target_frame(int c_id, SL_Quaternion* quat, SL_Vector3* vec, SL_Quaternion* targetQuaternion, SL_Vector3* targetTranslation, enum SL_REFERENCE_FRAME reference_frame) {
@@ -1213,12 +1265,6 @@ extern "C" {
             return nullptr;
     }
 
-    INTERFACE_API void sl_pause_object_detection(int c_id, bool status, unsigned int instance_id) {
-        if (!ZEDController::get(c_id)->isNull()) {
-            ZEDController::get(c_id)->pauseObjectDetection(status, instance_id);
-        }
-    }
-
     INTERFACE_API void sl_disable_object_detection(int c_id, unsigned int instance_id, bool force_disable_all_instances) {
         if (!ZEDController::get(c_id)->isNull()) {
             ZEDController::get(c_id)->disableObjectDetection(instance_id, force_disable_all_instances);
@@ -1239,12 +1285,6 @@ extern "C" {
         }
         else
             return nullptr;
-    }
-
-    INTERFACE_API void sl_pause_body_tracking(int c_id, bool status, unsigned int instance_id) {
-        if (!ZEDController::get(c_id)->isNull()) {
-            ZEDController::get(c_id)->pauseBodyTracking(status, instance_id);
-        }
     }
 
     INTERFACE_API void sl_disable_body_tracking(int c_id, unsigned int instance_id, bool force_disable_all_instances) {
@@ -1521,6 +1561,18 @@ extern "C" {
         }
     }
 
+    INTERFACE_API struct SL_FusedPositionalTrackingStatus* sl_fusion_get_fused_positional_tracking_status()
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            return ZEDFusionController::get()->getFusedPositionalTrackingStatus();
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
 
     INTERFACE_API void sl_fusion_disable_positional_tracking()
     {
@@ -1552,7 +1604,7 @@ extern "C" {
         }
     }
 
-    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_get_geo_pose(SL_GeoPose* pose, bool radian)
+    INTERFACE_API enum SL_GNSS_FUSION_STATUS sl_fusion_get_geo_pose(SL_GeoPose* pose, bool radian)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
@@ -1560,11 +1612,11 @@ extern "C" {
         }
         else
         {
-            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+            return SL_GNSS_FUSION_STATUS_OFF;
         }
     }
 
-    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_geo_to_camera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian)
+    INTERFACE_API enum SL_GNSS_FUSION_STATUS sl_fusion_geo_to_camera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
@@ -1572,11 +1624,11 @@ extern "C" {
         }
         else
         {
-            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+            return SL_GNSS_FUSION_STATUS_OFF;
         }
     }
 
-    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_camera_to_geo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian)
+    INTERFACE_API enum SL_GNSS_FUSION_STATUS sl_fusion_camera_to_geo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
@@ -1584,7 +1636,7 @@ extern "C" {
         }
         else
         {
-            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+            return SL_GNSS_FUSION_STATUS_OFF;
         }
     }
 
@@ -1600,7 +1652,7 @@ extern "C" {
         }
     }
 
-    INTERFACE_API enum SL_GNSS_CALIBRATION_STATE sl_fusion_get_current_gnss_calibration_std(float* yaw_std, struct SL_Vector3* position_std)
+    INTERFACE_API enum SL_GNSS_FUSION_STATUS sl_fusion_get_current_gnss_calibration_std(float* yaw_std, struct SL_Vector3* position_std)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
@@ -1608,7 +1660,7 @@ extern "C" {
         }
         else
         {
-            return SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+            return SL_GNSS_FUSION_STATUS_OFF;
         }
     }
 

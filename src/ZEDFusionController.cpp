@@ -410,6 +410,23 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getPosition(SL_PoseData* poseD
 	return (SL_POSITIONAL_TRACKING_STATE)state;
 }
 
+struct SL_FusedPositionalTrackingStatus* ZEDFusionController::getFusedPositionalTrackingStatus()
+{
+	SL_FusedPositionalTrackingStatus* fused_status = new SL_FusedPositionalTrackingStatus();
+	memset(fused_status, 0, sizeof(SL_FusedPositionalTrackingStatus));
+
+	sl::FusedPositionalTrackingStatus sdk_status = fusion.getFusedPositionalTrackingStatus();
+
+	fused_status->gnss_fusion_status = (enum SL_GNSS_FUSION_STATUS)sdk_status.gnss_fusion_status;
+	fused_status->gnss_status = (enum SL_GNSS_STATUS)sdk_status.gnss_status;
+	fused_status->odometry_status = (enum SL_ODOMETRY_STATUS)sdk_status.odometry_status;
+	fused_status->spatial_memory_status = (enum SL_SPATIAL_MEMORY_STATUS)sdk_status.spatial_memory_status;
+	fused_status->gnss_mode = (enum SL_GNSS_MODE)sdk_status.gnss_mode;
+	fused_status->tracking_fusion_status = (enum SL_POSITIONAL_TRACKING_FUSION_STATUS)sdk_status.tracking_fusion_status;
+
+	return fused_status;
+}
+
 void ZEDFusionController::disablePositionalTracking() {
 	fusion.disablePositionalTracking();
 }
@@ -454,14 +471,14 @@ SL_POSITIONAL_TRACKING_STATE ZEDFusionController::getCurrentGNSSData(struct SL_G
 	return state;
 }
 
-enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::getGeoPose(struct SL_GeoPose* pose, bool radian)
+enum SL_GNSS_FUSION_STATUS ZEDFusionController::getGeoPose(struct SL_GeoPose* pose, bool radian)
 {
-	SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+	SL_GNSS_FUSION_STATUS state = SL_GNSS_FUSION_STATUS_OFF;
 
 	memset(pose, 0, sizeof(SL_GeoPose));
 
 	sl::GeoPose sdk_pose;
-	state = (SL_GNSS_CALIBRATION_STATE)fusion.getGeoPose(sdk_pose);
+	state = (SL_GNSS_FUSION_STATUS)fusion.getGeoPose(sdk_pose);
 
 	pose->heading = sdk_pose.heading;
 	pose->horizontal_accuracy = sdk_pose.horizontal_accuracy;
@@ -490,9 +507,9 @@ enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::getGeoPose(struct SL_GeoPose
 	return state;
 }
 
-enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::geoToCamera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian)
+enum SL_GNSS_FUSION_STATUS ZEDFusionController::geoToCamera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian)
 {
-	enum SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+	enum SL_GNSS_FUSION_STATUS state = SL_GNSS_FUSION_STATUS_OFF;
 
 	memset(out, 0, sizeof(SL_PoseData));
 
@@ -500,7 +517,7 @@ enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::geoToCamera(struct SL_LatLng
 	latLng.setCoordinates(in->latitude, in->longitude, in->altitude, radian);
 
 	sl::Pose pose;
-	state = (enum SL_GNSS_CALIBRATION_STATE)fusion.Geo2Camera(latLng, pose);
+	state = (enum SL_GNSS_FUSION_STATUS)fusion.Geo2Camera(latLng, pose);
 	out->pose_confidence = pose.pose_confidence;
 
 	for (int i = 0; i < 36; i++)
@@ -532,9 +549,9 @@ enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::geoToCamera(struct SL_LatLng
 	return state;
 }
 
-enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::cameraToGeo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian)
+enum SL_GNSS_FUSION_STATUS ZEDFusionController::cameraToGeo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian)
 {
-	SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+	SL_GNSS_FUSION_STATUS state = SL_GNSS_FUSION_STATUS_OFF;
 
 	memset(out, 0, sizeof(SL_GeoPose));
 
@@ -558,7 +575,7 @@ enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::cameraToGeo(struct SL_PoseDa
 
 	pose.valid = in->valid;
 
-	state = (SL_GNSS_CALIBRATION_STATE)fusion.Camera2Geo(pose, sdk_pose);
+	state = (SL_GNSS_FUSION_STATUS)fusion.Camera2Geo(pose, sdk_pose);
 
 	out->heading = sdk_pose.heading;
 	out->horizontal_accuracy = sdk_pose.horizontal_accuracy;
@@ -586,11 +603,11 @@ enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::cameraToGeo(struct SL_PoseDa
 	return state;
 }
 
-enum SL_GNSS_CALIBRATION_STATE ZEDFusionController::getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std)
+enum SL_GNSS_FUSION_STATUS ZEDFusionController::getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std)
 {
-	SL_GNSS_CALIBRATION_STATE state = SL_GNSS_CALIBRATION_STATE_NOT_CALIBRATED;
+	SL_GNSS_FUSION_STATUS state = SL_GNSS_FUSION_STATUS_OFF;
 	sl::float3 sdk_position_std;
-	state = (SL_GNSS_CALIBRATION_STATE)fusion.getCurrentGNSSCalibrationSTD(*yaw_std, sdk_position_std);
+	state = (SL_GNSS_FUSION_STATUS)fusion.getCurrentGNSSCalibrationSTD(*yaw_std, sdk_position_std);
 
 	position_std->x = sdk_position_std.x;
 	position_std->y = sdk_position_std.y;

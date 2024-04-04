@@ -145,6 +145,12 @@ public:
      */
     enum SL_POSITIONAL_TRACKING_STATE getPosition(struct SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame, struct SL_CameraIdentifier* uuid, enum SL_POSITION_TYPE retrieve_type);
 
+    /**
+     * @brief Get the current status of fused position.
+     * \return SL_FusedPositionalTrackingStatus is the current status of the tracking process.
+     */
+    struct SL_FusedPositionalTrackingStatus* getFusedPositionalTrackingStatus();
+
     ///
     /// \brief disable Positional Tracking fusion module
     ///
@@ -155,13 +161,13 @@ public:
 
     enum SL_POSITIONAL_TRACKING_STATE getCurrentGNSSData(struct SL_GNSSData* data, bool radian);
 
-    enum SL_GNSS_CALIBRATION_STATE getGeoPose(struct SL_GeoPose* pose, bool radian);
+    enum SL_GNSS_FUSION_STATUS getGeoPose(struct SL_GeoPose* pose, bool radian);
 
-    enum SL_GNSS_CALIBRATION_STATE geoToCamera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian);
+    enum SL_GNSS_FUSION_STATUS geoToCamera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian);
 
-    enum SL_GNSS_CALIBRATION_STATE cameraToGeo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian);
+    enum SL_GNSS_FUSION_STATUS cameraToGeo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian);
 
-    enum SL_GNSS_CALIBRATION_STATE getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std);
+    enum SL_GNSS_FUSION_STATUS getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std);
 
     void getGeoTrackingCalibration(struct SL_Vector3* translation, struct SL_Quaternion* rotation);
 

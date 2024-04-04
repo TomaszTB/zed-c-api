@@ -135,7 +135,7 @@ int ZEDController::initFromStream(SL_InitParameters *params, const char* ip, int
 
     char buffer_verbose[2048];
     if (cameraOpened) {
-        sprintf(buffer_verbose, "[initFromUSB] Camera already opened %d = %d return success", params->camera_device_id, camera_ID);
+        sprintf(buffer_verbose, "[initFromStream] Camera already opened %d = %d return success", params->camera_device_id, camera_ID);
         return 0;
     }
 
@@ -175,10 +175,10 @@ int ZEDController::initFromGMSL(SL_InitParameters* params, const unsigned int se
 
     char buffer_verbose[2048];
     if (cameraOpened) {
-        sprintf(buffer_verbose, "[initFromUSB] Camera already opened %d = %d return success", params->camera_device_id, camera_ID);
+        sprintf(buffer_verbose, "[initFromGMSL] Camera already opened %d = %d return success", params->camera_device_id, camera_ID);
         return 0;
     }
-    sprintf(buffer_verbose, "ENTER ZEDController::initFromUSB %d = %d", params->camera_device_id, camera_ID);
+    sprintf(buffer_verbose, "ENTER ZEDController::initFromGMSL %d = %d", params->camera_device_id, camera_ID);
     initParams.camera_resolution = (sl::RESOLUTION)params->resolution;
     if (serial_number > 0) {
         initParams.input.setFromSerialNumber(serial_number, sl::BUS_TYPE::GMSL);
@@ -225,7 +225,7 @@ int ZEDController::open() {
         cameraOpened = true;
         input_type = (int) zed.getCameraInformation().input_type;
         char buffer_verbose[2048];
-        sprintf(buffer_verbose, "FUNC ZEDController::init : [SUCCESS Open Camera ID : %d ]", (int) OpeningErrorCode);
+        sprintf(buffer_verbose, "FUNC ZEDController::open : [SUCCESS Open Camera ID : %d ]", (int) OpeningErrorCode);
     } else {
         width = -1;
         height = -1;
@@ -233,7 +233,7 @@ int ZEDController::open() {
         input_type = -1;
         cameraOpened = false;
         char buffer_verbose[2048];
-        sprintf(buffer_verbose, "FUNC ZEDController::init : [CLOSE Camera ID : %d ]", (int) OpeningErrorCode);
+        sprintf(buffer_verbose, "FUNC ZEDController::open : [CLOSE Camera ID : %d ]", (int) OpeningErrorCode);
         zed.close();
     }
 
@@ -706,13 +706,138 @@ SL_RecordingStatus* ZEDController::getRecordingStatus() {
 		return nullptr;
 }
 
+sl::ERROR_CODE ZEDController::ingestDataIntoSVO(struct SL_SVOData* data)
+{
+    if (!isNull()) {
+        sl::SVOData sdk_svo_data;
+        sdk_svo_data.timestamp_ns = data->timestamp_ns;
+        sdk_svo_data.key = std::string(data->key);
+        sdk_svo_data.setContent(std::string(data->content));
+
+        return zed.ingestDataIntoSVO(sdk_svo_data);
+    }
+    else
+        return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
+int ZEDController::getSVODataSize(char key[128], unsigned long long ts_begin, unsigned long long ts_end)
+{
+    if (!isNull()) {
+        std::map<sl::Timestamp, sl::SVOData> sdk_data;
+        auto err = zed.retrieveSVOData(std::string(key), sdk_data, ts_begin, ts_end);
+        if (err == sl::ERROR_CODE::SUCCESS)
+        {
+            currentSVOData = sdk_data;
+            isSVODataReady = true;
+            return sdk_data.size();
+        }
+        return -1;
+    }
+    return -1;
+}
+sl::ERROR_CODE ZEDController::retrieveSVOData(char key[128], int nb_data, struct SL_SVOData* data, unsigned long long ts_begin, unsigned long long ts_end)
+{
+    if (!isNull()) {
+        if (isSVODataReady)
+        {
+            int idx = 0;
+            for (auto const& sdk_svo_data : currentSVOData)
+            {
+                if (idx < nb_data)
+                {
+                    SL_SVOData svo_data;
+                    memset(&svo_data, 0, sizeof(SL_SVOData));
+                    svo_data.timestamp_ns = sdk_svo_data.second.timestamp_ns;
+                    std::string content;
+                    sdk_svo_data.second.getContent(content);
+                    svo_data.content_size = content.size();
+                    svo_data.content = (char*)malloc(svo_data.content_size);
+                    strcpy(svo_data.content, content.c_str());
+                    if (sdk_svo_data.second.key.size() < 128)
+                        strcpy(&svo_data.key[0], sdk_svo_data.second.key.c_str());
+
+                    data[idx] = svo_data;
+                    idx++;
+                }
+            }
+
+            isSVODataReady = false;
+            return sl::ERROR_CODE::SUCCESS;
+        }
+        return sl::ERROR_CODE::FAILURE;
+    }
+    else
+        return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
+int ZEDController::getSVODataKeysSize()
+{
+    if (!isNull()) {
+        return zed.getSVODataKeys().size();
+    }
+    else
+        return -1;
+}
+
+void ZEDController::getSVODataKeys(int nb_keys, char* keys[128])
+{
+    if (!isNull()) {
+        std::vector<std::string> sdk_svo_data_keys = zed.getSVODataKeys();
+
+        for (int i = 0; i < nb_keys; i++)
+        {
+            if (sdk_svo_data_keys[i].size() < 128)
+            {
+                strcpy(keys[i], sdk_svo_data_keys[i].c_str());
+            }
+        }
+    }
+    else
+        keys = nullptr;
+}
+
+sl::ERROR_CODE ZEDController::setRegionOfInterest(sl::Mat mask, bool module[SL_MODULE_LAST])
+{
+    sl::ERROR_CODE err = sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+    if (!isNull())
+    {
+        std::unordered_set<sl::MODULE> sdk_module;
+        for (int i = 0; i < SL_MODULE_LAST; i++)
+        {
+            if (module[i] == true)
+            {
+                sdk_module.emplace((sl::MODULE)i);
+            }
+        }
+
+        err = zed.setRegionOfInterest(mask, sdk_module);
+    }
+    return err;
+}
+
+sl::ERROR_CODE ZEDController::getRegionOfInterest(sl::Mat mask, sl::Resolution mask_size, enum SL_MODULE module)
+{
+    sl::ERROR_CODE err = sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+    if (!isNull())
+    {
+        err = zed.getRegionOfInterest(mask, mask_size, (sl::MODULE)module);
+    }
+    return err;
+}
+
 sl::ERROR_CODE ZEDController::startRegionOfInterestAutoDetection(SL_RegionOfInterestParameters* roi_params)
 {
     sl::ERROR_CODE err = sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     if (!isNull()) 
     {
         sl::RegionOfInterestParameters sdk_params;
-        sdk_params.auto_apply = roi_params->auto_apply;
+        for (int i = 0; i < SL_MODULE_LAST; i++)
+        {
+            if (roi_params->auto_apply_module[i] == true)
+            {
+                sdk_params.auto_apply_module.emplace((sl::MODULE)i);
+            }
+        }
         sdk_params.depth_far_threshold_meters = roi_params->depth_far_threshold_meters;
         sdk_params.image_height_ratio_cutoff = roi_params->image_height_ratio_cutoff;
 
@@ -934,6 +1059,24 @@ sl::POSITIONAL_TRACKING_STATE ZEDController::getPoseArray(float* pose, int mat_t
         return v;
     } else
         return sl::POSITIONAL_TRACKING_STATE::OFF;
+}
+
+struct SL_PositionalTrackingStatus* ZEDController::getPositionalTrackingStatus()
+{
+    if (!isNull()) {
+        SL_PositionalTrackingStatus* tracking_status = new SL_PositionalTrackingStatus();
+        memset(tracking_status, 0, sizeof(SL_PositionalTrackingStatus));
+
+        sl::PositionalTrackingStatus sdk_status = zed.getPositionalTrackingStatus();
+
+        tracking_status->odometry_status = (enum SL_ODOMETRY_STATUS)sdk_status.odometry_status;
+        tracking_status->spatial_memory_status = (enum SL_SPATIAL_MEMORY_STATUS)sdk_status.spatial_memory_status;
+        tracking_status->tracking_fusion_status = (enum SL_POSITIONAL_TRACKING_FUSION_STATUS)sdk_status.tracking_fusion_status;
+
+        return tracking_status;
+    }
+    else
+        return nullptr;
 }
 
 sl::CameraInformation* ZEDController::getSLCameraInformation() {
@@ -1705,11 +1848,11 @@ sl::ERROR_CODE ZEDController::enableObjectDetection(SL_ObjectDetectionParameters
         sl::ERROR_CODE v;
         sl::ObjectDetectionParameters params;
         params.instance_module_id = obj_params->instance_module_id;
-        params.image_sync = obj_params->image_sync;
         params.enable_tracking = obj_params->enable_tracking;
         params.detection_model = (sl::OBJECT_DETECTION_MODEL)obj_params->detection_model;
 		params.filtering_mode = (sl::OBJECT_FILTERING_MODE)obj_params->filtering_mode;
         params.prediction_timeout_s = obj_params->prediction_timeout_s;
+        params.enable_segmentation = obj_params->enable_segmentation;
         if (obj_params->max_range > 0)
             params.max_range = obj_params->max_range;
 
@@ -1739,7 +1882,6 @@ sl::ERROR_CODE ZEDController::enableBodyTracking(SL_BodyTrackingParameters* body
         sl::ERROR_CODE v;
         sl::BodyTrackingParameters params;
         params.instance_module_id = body_params->instance_module_id;
-        params.image_sync = body_params->image_sync;
         params.enable_tracking = body_params->enable_tracking;
         params.enable_segmentation = body_params->enable_segmentation;
         params.enable_body_fitting = body_params->enable_body_fitting;
@@ -1784,8 +1926,8 @@ SL_ObjectDetectionParameters* ZEDController::getObjectDetectionParameters() {
 	c_odParams->batch_parameters.latency = batchParams.latency;
 
 	c_odParams->enable_tracking = odParams.enable_tracking;
+    c_odParams->enable_segmentation = odParams.enable_segmentation;
 	c_odParams->filtering_mode = (SL_OBJECT_FILTERING_MODE)odParams.filtering_mode;
-	c_odParams->image_sync = odParams.image_sync;
 	c_odParams->max_range = odParams.max_range;
 	c_odParams->detection_model = (SL_OBJECT_DETECTION_MODEL)odParams.detection_model;
     c_odParams->prediction_timeout_s = odParams.prediction_timeout_s;
@@ -1811,7 +1953,6 @@ SL_BodyTrackingParameters* ZEDController::getBodyTrackingParameters() {
     c_btParams->enable_body_fitting = btParams.enable_body_fitting;
     c_btParams->enable_segmentation = btParams.enable_segmentation;
     c_btParams->enable_tracking = btParams.enable_tracking;
-    c_btParams->image_sync = btParams.image_sync;
     c_btParams->max_range = btParams.max_range;
     c_btParams->detection_model = (SL_BODY_TRACKING_MODEL)btParams.detection_model;
     c_btParams->prediction_timeout_s = btParams.prediction_timeout_s;
@@ -1820,28 +1961,12 @@ SL_BodyTrackingParameters* ZEDController::getBodyTrackingParameters() {
     return c_btParams;
 }
 
-void ZEDController::pauseObjectDetection(bool status, unsigned int instance_id) {
-    if (!isNull()) {
-        sdk_mutex.lock();
-        zed.pauseObjectDetection(status, instance_id);
-        sdk_mutex.unlock();
-    }
-}
-
 void ZEDController::disableObjectDetection(unsigned int instance_id, bool force_disable_all_instances) {
     if (!isNull()) {
         sdk_mutex.lock();
         zed.disableObjectDetection(instance_id, force_disable_all_instances);
         sdk_mutex.unlock();
         isObjectsTrajectoriesUpdated = false;
-    }
-}
-
-void ZEDController::pauseBodyTracking(bool status, unsigned int instance_id) {
-    if (!isNull()) {
-        sdk_mutex.lock();
-        zed.pauseObjectDetection(status, instance_id);
-        sdk_mutex.unlock();
     }
 }
 

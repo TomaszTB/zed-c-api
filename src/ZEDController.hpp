@@ -54,6 +54,8 @@ public:
 
     sl::POSITIONAL_TRACKING_STATE getPoseArray(float* pose, int mat_type);
 
+    struct SL_PositionalTrackingStatus* getPositionalTrackingStatus();
+
     inline unsigned int getWidth() {
         return width;
     }
@@ -79,6 +81,11 @@ public:
 	SL_RecordingStatus* getRecordingStatus();
 	SL_RecordingParameters* getRecordingParameters();
 
+    sl::ERROR_CODE ingestDataIntoSVO(struct SL_SVOData* data);
+    int getSVODataSize(char key[128], unsigned long long ts_begin, unsigned long long ts_end);
+    sl::ERROR_CODE retrieveSVOData(char key[128], int nb_data, struct SL_SVOData* data, unsigned long long ts_begin, unsigned long long ts_end);
+    int getSVODataKeysSize();
+    void getSVODataKeys(int nb_keys, char* keys[128]);
 
     /************Tracking*******************/
     sl::ERROR_CODE enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin, bool set_as_static,
@@ -97,6 +104,8 @@ public:
     sl::ERROR_CODE getSensorsData(SL_SensorsData *sensorData, int time_reference);
 
     sl::ERROR_CODE startRegionOfInterestAutoDetection(SL_RegionOfInterestParameters* roi_params);
+    sl::ERROR_CODE setRegionOfInterest(sl::Mat mask, bool module[SL_MODULE_LAST]);
+    sl::ERROR_CODE getRegionOfInterest(sl::Mat mask, sl::Resolution mask_size, enum SL_MODULE module);
 
     /***********Spatial mapping *********/
     sl::ERROR_CODE enableSpatialMapping(struct SL_SpatialMappingParameters mapping_param);
@@ -170,9 +179,7 @@ public:
     sl::ERROR_CODE enableBodyTracking(SL_BodyTrackingParameters* body_params);
 	SL_ObjectDetectionParameters* getObjectDetectionParameters();
     SL_BodyTrackingParameters* getBodyTrackingParameters();
-    void pauseObjectDetection(bool status, unsigned int instance_id);
     void disableObjectDetection(unsigned int instance_id, bool force_disable_all_instances);
-    void pauseBodyTracking(bool status, unsigned int instance_id);
     void disableBodyTracking(unsigned int instance_id, bool force_disable_all_instances);
 	sl::ERROR_CODE ingestCustomBoxObjectData(int nb_objects, SL_CustomBoxObjectData* objects_in);
     sl::ERROR_CODE retrieveObjectDetectionData(SL_ObjectDetectionRuntimeParameters* objruntimeparams, SL_Objects* data, unsigned int instance_id);
@@ -213,6 +220,9 @@ private:
     sl::Plane currentFloorPlaneSDK;
     sl::Plane currentPlaneAtHitSDK;
     bool activTracking;
+
+    std::map<sl::Timestamp, sl::SVOData> currentSVOData;
+    bool isSVODataReady = false;
 
     int input_type;
     unsigned int width;
