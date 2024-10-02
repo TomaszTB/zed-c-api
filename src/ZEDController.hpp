@@ -181,8 +181,10 @@ public:
     SL_BodyTrackingParameters* getBodyTrackingParameters();
     void disableObjectDetection(unsigned int instance_id, bool force_disable_all_instances);
     void disableBodyTracking(unsigned int instance_id, bool force_disable_all_instances);
-	sl::ERROR_CODE ingestCustomBoxObjectData(int nb_objects, SL_CustomBoxObjectData* objects_in);
+    sl::ERROR_CODE ingestCustomBoxObjectData(int nb_objects, SL_CustomBoxObjectData* objects_in, unsigned int instance_id);
+    sl::ERROR_CODE ingestCustomMaskObjectData(int nb_objects, SL_CustomMaskObjectData* objects_in, unsigned int instance_id);
     sl::ERROR_CODE retrieveObjectDetectionData(SL_ObjectDetectionRuntimeParameters* objruntimeparams, SL_Objects* data, unsigned int instance_id);
+    sl::ERROR_CODE retrieveCustomObjectDetectionData(SL_CustomObjectDetectionRuntimeParameters* objruntimeparams, SL_Objects* data, unsigned int instance_id);
     sl::ERROR_CODE retrieveBodyTrackingData(SL_BodyTrackingRuntimeParameters* bodyruntimeparams, SL_Bodies* data, unsigned int instance_id);
 
     sl::ERROR_CODE updateObjectsBatch(int* nb_batches);
@@ -209,6 +211,12 @@ public:
     sl::Camera zed;
 
 private:
+
+#if WITH_OBJECT_DETECTION
+    template <typename SL_ObjectDetectionRuntimeParameters_t>
+    sl::ERROR_CODE retrieveObjects(SL_ObjectDetectionRuntimeParameters_t* runtimeParams, SL_Objects* data, unsigned int instance_id);
+#endif
+
     int open();
 
     bool cameraOpened = false;

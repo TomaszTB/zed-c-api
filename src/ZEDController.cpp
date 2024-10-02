@@ -1844,36 +1844,44 @@ int ZEDController::getInputType() {
 
 sl::ERROR_CODE ZEDController::enableObjectDetection(SL_ObjectDetectionParameters* obj_params) {
 
-    if (!isNull()) {
-        sl::ERROR_CODE v;
-        sl::ObjectDetectionParameters params;
-        params.instance_module_id = obj_params->instance_module_id;
-        params.enable_tracking = obj_params->enable_tracking;
-        params.detection_model = (sl::OBJECT_DETECTION_MODEL)obj_params->detection_model;
-		params.filtering_mode = (sl::OBJECT_FILTERING_MODE)obj_params->filtering_mode;
-        params.prediction_timeout_s = obj_params->prediction_timeout_s;
-        params.enable_segmentation = obj_params->enable_segmentation;
-        if (obj_params->max_range > 0)
-            params.max_range = obj_params->max_range;
+    if (isNull())
+        return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 
-        sl::BatchParameters batch_parameters;
-        batch_parameters.enable = obj_params->batch_parameters.enable;
-        if (obj_params->batch_parameters.id_retention_time > 0) {
-            batch_parameters.id_retention_time = obj_params->batch_parameters.id_retention_time;
-        }
-        if (obj_params->batch_parameters.latency > 0) {
-            batch_parameters.latency = obj_params->batch_parameters.latency;
-        }
-        params.batch_parameters = batch_parameters;
-        current_object_detection_model = params.detection_model;
-        sdk_mutex.lock();
-        v = zed.enableObjectDetection(params);
-        sdk_mutex.unlock();
+    if (obj_params == NULL)
+        return sl::ERROR_CODE::FAILURE;
 
-        isObjectsTrajectoriesUpdated = false;
-        return v;
+    sl::ObjectDetectionParameters params;
+    params.instance_module_id = obj_params->instance_module_id;
+    params.enable_tracking = obj_params->enable_tracking;
+    params.detection_model = (sl::OBJECT_DETECTION_MODEL)obj_params->detection_model;
+    params.filtering_mode = (sl::OBJECT_FILTERING_MODE)obj_params->filtering_mode;
+    params.prediction_timeout_s = obj_params->prediction_timeout_s;
+    params.enable_segmentation = obj_params->enable_segmentation;
+    if (obj_params->max_range > 0)
+        params.max_range = obj_params->max_range;
+    if (obj_params->fused_objects_group_name != NULL && strlen(obj_params->fused_objects_group_name) > 0)
+        params.fused_objects_group_name.set(obj_params->fused_objects_group_name);
+    if (obj_params->custom_onnx_file != NULL && strlen(obj_params->custom_onnx_file) > 0)
+        params.custom_onnx_file.set(obj_params->custom_onnx_file);
+    params.custom_onnx_dynamic_input_shape.width = obj_params->custom_onnx_dynamic_input_shape.width;
+    params.custom_onnx_dynamic_input_shape.height = obj_params->custom_onnx_dynamic_input_shape.height;
+
+    sl::BatchParameters batch_parameters;
+    batch_parameters.enable = obj_params->batch_parameters.enable;
+    if (obj_params->batch_parameters.id_retention_time > 0) {
+        batch_parameters.id_retention_time = obj_params->batch_parameters.id_retention_time;
     }
-    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+    if (obj_params->batch_parameters.latency > 0) {
+        batch_parameters.latency = obj_params->batch_parameters.latency;
+    }
+    params.batch_parameters = batch_parameters;
+    current_object_detection_model = params.detection_model;
+    sdk_mutex.lock();
+    sl::ERROR_CODE v = zed.enableObjectDetection(params);
+    sdk_mutex.unlock();
+
+    isObjectsTrajectoriesUpdated = false;
+    return v;
 }
 
 sl::ERROR_CODE ZEDController::enableBodyTracking(SL_BodyTrackingParameters* body_params) {
@@ -1932,6 +1940,16 @@ SL_ObjectDetectionParameters* ZEDController::getObjectDetectionParameters() {
 	c_odParams->detection_model = (SL_OBJECT_DETECTION_MODEL)odParams.detection_model;
     c_odParams->prediction_timeout_s = odParams.prediction_timeout_s;
     c_odParams->instance_module_id = odParams.instance_module_id;
+    c_odParams->custom_onnx_dynamic_input_shape.width = odParams.custom_onnx_dynamic_input_shape.width;
+    c_odParams->custom_onnx_dynamic_input_shape.height = odParams.custom_onnx_dynamic_input_shape.height;
+    if (odParams.fused_objects_group_name.size() > 0) {
+        c_odParams->fused_objects_group_name = (char*)malloc(odParams.fused_objects_group_name.size() * sizeof(char));
+        strcpy(c_odParams->fused_objects_group_name, odParams.fused_objects_group_name.c_str());
+    }
+    if (odParams.custom_onnx_file.size() > 0) {
+        c_odParams->custom_onnx_file = (char*)malloc(odParams.custom_onnx_file.size() * sizeof(char));
+        strcpy(c_odParams->custom_onnx_file, odParams.custom_onnx_file.c_str());
+    }
 
 	return c_odParams;
 }
@@ -1978,7 +1996,7 @@ void ZEDController::disableBodyTracking(unsigned int instance_id, bool force_dis
     }
 }
 
-sl::ERROR_CODE ZEDController::ingestCustomBoxObjectData(int nb_objects, SL_CustomBoxObjectData* objects_in)
+sl::ERROR_CODE ZEDController::ingestCustomBoxObjectData(int nb_objects, SL_CustomBoxObjectData* objects_in, unsigned int instance_id)
 {
 	if (!isNull()) {
 		std::vector<sl::CustomBoxObjectData> objs;
@@ -1991,6 +2009,9 @@ sl::ERROR_CODE ZEDController::ingestCustomBoxObjectData(int nb_objects, SL_Custo
 			tmp.label = obj.label;
 			tmp.probability = obj.probability;
 			tmp.is_grounded = obj.is_grounded;
+			tmp.is_static = obj.is_static;
+			tmp.tracking_timeout = obj.tracking_timeout;
+			tmp.tracking_max_dist = obj.tracking_max_dist;
 			for (int l = 0; l < 4; l++) {
 				sl::uint2 value;
 				value.x = obj.bounding_box_2d[l].x;
@@ -2000,14 +2021,124 @@ sl::ERROR_CODE ZEDController::ingestCustomBoxObjectData(int nb_objects, SL_Custo
 			}
 			objs.push_back(tmp);
 		}
-		sl::ERROR_CODE err = zed.ingestCustomBoxObjects(objs);
+		sl::ERROR_CODE err = zed.ingestCustomBoxObjects(objs, instance_id);
 		return err;
 	}
 	return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
+sl::ERROR_CODE ZEDController::ingestCustomMaskObjectData(int nb_objects, SL_CustomMaskObjectData* objects_in, unsigned int instance_id)
+{
+	if (!isNull()) {
+		std::vector<sl::CustomMaskObjectData> objs;
+		objs.reserve(nb_objects);
+		for (int i = 0; i < nb_objects; i++) 
+		{
+			objs.emplace_back();
+			SL_CustomMaskObjectData obj = objects_in[i];
+			sl::CustomMaskObjectData &tmp = objs.back();
+
+			tmp.unique_object_id = sl::String(obj.unique_object_id);
+			tmp.label = obj.label;
+			tmp.probability = obj.probability;
+			tmp.is_grounded = obj.is_grounded;
+			tmp.is_static = obj.is_static;
+			tmp.tracking_timeout = obj.tracking_timeout;
+			tmp.tracking_max_dist = obj.tracking_max_dist;
+			for (int l = 0; l < 4; l++) {
+				sl::uint2 value;
+				value.x = obj.bounding_box_2d[l].x;
+				value.y = obj.bounding_box_2d[l].y;
+
+				tmp.bounding_box_2d.push_back(value);
+			}
+			size_t box_w = tmp.bounding_box_2d[2U].x - tmp.bounding_box_2d[0U].x;
+			size_t box_h = tmp.bounding_box_2d[2U].y - tmp.bounding_box_2d[0U].y;
+			sl::Mat sl_mask{box_w, box_h, sl::MAT_TYPE::U8_C1, obj.box_mask, box_w * sizeof(sl::uchar1)};
+			sl_mask.copyTo(tmp.box_mask, sl::COPY_TYPE::CPU_CPU);
+			objs.push_back(tmp);
+		}
+		sl::ERROR_CODE err = zed.ingestCustomMaskObjects(objs, instance_id);
+		return err;
+	}
+	return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
+static void convertObjects(const sl::Objects& in_data,
+                           const sl::OBJECT_DETECTION_MODEL current_object_detection_model,
+                           SL_Objects* out_data)
+{
+    out_data->is_new = in_data.is_new;
+    out_data->is_tracked = in_data.is_tracked;
+    out_data->detection_model = (SL_OBJECT_DETECTION_MODEL) current_object_detection_model;
+    out_data->timestamp = in_data.timestamp;
+    out_data->nb_objects = in_data.object_list.size();
+
+    int count = 0;
+    for (const sl::ObjectData &p : in_data.object_list) {
+        if (count < MAX_NUMBER_OBJECT) {
+            out_data->object_list[count].label = (SL_OBJECT_CLASS) p.label;
+            out_data->object_list[count].sublabel = (SL_OBJECT_SUBCLASS) p.sublabel;
+            out_data->object_list[count].tracking_state = (SL_OBJECT_TRACKING_STATE) p.tracking_state;
+            out_data->object_list[count].action_state = (SL_OBJECT_ACTION_STATE) p.action_state;
+            out_data->object_list[count].id = p.id;
+            out_data->object_list[count].confidence = p.confidence;
+            out_data->object_list[count].raw_label = p.raw_label;
+
+            memcpy(out_data->object_list[count].unique_object_id, p.unique_object_id.get(), 37 * sizeof(char));
+
+            for (int k = 0; k < 6; k++)
+                out_data->object_list[count].position_covariance[k] = p.position_covariance[k];
+
+            out_data->object_list[count].mask = (int*)(new sl::Mat(p.mask));
+
+            for (int l = 0; l < p.bounding_box_2d.size(); l++) {
+                out_data->object_list[count].bounding_box_2d[l].x = (float) p.bounding_box_2d.at(l).x;
+                out_data->object_list[count].bounding_box_2d[l].y = (float) p.bounding_box_2d.at(l).y;
+            }
+
+            for (int l = 0; l < p.head_bounding_box.size(); l++) {
+                out_data->object_list[count].head_bounding_box[l].x = (float)p.head_bounding_box.at(l).x;
+                out_data->object_list[count].head_bounding_box[l].y = (float)p.head_bounding_box.at(l).y;
+            }
+
+            for (int l = 0; l < p.head_bounding_box_2d.size(); l++) {
+                out_data->object_list[count].head_bounding_box_2d[l].x = (float)p.head_bounding_box_2d.at(l).x;
+                out_data->object_list[count].head_bounding_box_2d[l].y = (float)p.head_bounding_box_2d.at(l).y;
+            }
+
+            // World data
+            out_data->object_list[count].position.x = p.position.x;
+            out_data->object_list[count].position.y = p.position.y;
+            out_data->object_list[count].position.z = p.position.z;
+
+            out_data->object_list[count].velocity.x = p.velocity.x;
+            out_data->object_list[count].velocity.y = p.velocity.y;
+            out_data->object_list[count].velocity.z = p.velocity.z;
+
+            out_data->object_list[count].dimensions.x = p.dimensions.x;
+            out_data->object_list[count].dimensions.y = p.dimensions.y;
+            out_data->object_list[count].dimensions.z = p.dimensions.z;
+
+            out_data->object_list[count].head_position.x = p.head_position.x;
+            out_data->object_list[count].head_position.y = p.head_position.y;
+            out_data->object_list[count].head_position.z = p.head_position.z;
+
+            // 3D Bounding box in world frame
+            for (int m = 0; m < 8; m++) {
+                if (m < p.bounding_box.size()) {
+                    out_data->object_list[count].bounding_box[m].x = p.bounding_box.at(m).x;
+                    out_data->object_list[count].bounding_box[m].y = p.bounding_box.at(m).y;
+                    out_data->object_list[count].bounding_box[m].z = p.bounding_box.at(m).z;
+                }
+            }
+            count++;
+        }
+    }
+}
+
 sl::ERROR_CODE ZEDController::retrieveObjectDetectionData(SL_ObjectDetectionRuntimeParameters* _objruntimeparams, SL_Objects* data, unsigned int instance_id) {
-    memset(data, 0, sizeof (SL_Objects));
+    memset(data, 0, sizeof(SL_Objects));
 
     if (!isNull()) {
         sl::Objects objects;
@@ -2030,77 +2161,43 @@ sl::ERROR_CODE ZEDController::retrieveObjectDetectionData(SL_ObjectDetectionRunt
         sl::ERROR_CODE v = zed.retrieveObjects(objects, runtime_params, instance_id);
 
         if (v == sl::ERROR_CODE::SUCCESS) {
-            data->is_new = objects.is_new;
-            data->is_tracked = objects.is_tracked;
-            data->detection_model = (SL_OBJECT_DETECTION_MODEL) current_object_detection_model;
-            int size_objects = objects.object_list.size();
-            data->timestamp = objects.timestamp;
-            data->nb_objects = size_objects;
+            convertObjects(objects, current_object_detection_model, data);
+        }
+        return v;
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
 
-            int count = 0;
+static void convert(const SL_CustomObjectDetectionProperties& in_data, sl::CustomObjectDetectionProperties& out_data) {
+    out_data.enabled = in_data.enabled;
+    out_data.detection_confidence_threshold = in_data.detection_confidence_threshold;
+    out_data.is_grounded = in_data.is_grounded;
+    out_data.is_static = in_data.is_static;
+    out_data.tracking_timeout = in_data.tracking_timeout;
+    out_data.tracking_max_dist = in_data.tracking_max_dist;
+    out_data.max_box_width_normalized = in_data.max_box_width_normalized;
+    out_data.min_box_width_normalized = in_data.min_box_width_normalized;
+    out_data.max_box_height_normalized = in_data.max_box_height_normalized;
+    out_data.min_box_height_normalized = in_data.min_box_height_normalized;
+}
 
-            for (auto &p : objects.object_list) {
-                if (count < MAX_NUMBER_OBJECT) {
-                    //data->data_object[count].valid = true;
-                    data->object_list[count].label = (SL_OBJECT_CLASS) p.label;
-                    data->object_list[count].sublabel = (SL_OBJECT_SUBCLASS) p.sublabel;
-                    data->object_list[count].tracking_state = (SL_OBJECT_TRACKING_STATE) p.tracking_state;
-                    data->object_list[count].action_state = (SL_OBJECT_ACTION_STATE) p.action_state;
-                    data->object_list[count].id = p.id;
-                    data->object_list[count].confidence = p.confidence;
-					data->object_list[count].raw_label = p.raw_label;
+sl::ERROR_CODE ZEDController::retrieveCustomObjectDetectionData(SL_CustomObjectDetectionRuntimeParameters* _objruntimeparams,
+                                                                SL_Objects* data,
+                                                                unsigned int instance_id
+) {
+    memset(data, 0, sizeof (SL_Objects));
 
-					memcpy(data->object_list[count].unique_object_id, p.unique_object_id, 37 * sizeof(char));
-
-
-                    for (int k = 0; k < 6; k++)
-                        data->object_list[count].position_covariance[k] = p.position_covariance[k];
-
-					data->object_list[count].mask = (int*)(new sl::Mat(p.mask));
-
-                    for (int l = 0; l < p.bounding_box_2d.size(); l++) {
-                        data->object_list[count].bounding_box_2d[l].x = (float) p.bounding_box_2d.at(l).x;
-                        data->object_list[count].bounding_box_2d[l].y = (float) p.bounding_box_2d.at(l).y;
-                    }
-
-                    for (int l = 0; l < p.head_bounding_box.size(); l++) {
-                        data->object_list[count].head_bounding_box[l].x = (float)p.head_bounding_box.at(l).x;
-                        data->object_list[count].head_bounding_box[l].y = (float)p.head_bounding_box.at(l).y;
-                    }
-
-                    for (int l = 0; l < p.head_bounding_box_2d.size(); l++) {
-                        data->object_list[count].head_bounding_box_2d[l].x = (float)p.head_bounding_box_2d.at(l).x;
-                        data->object_list[count].head_bounding_box_2d[l].y = (float)p.head_bounding_box_2d.at(l).y;
-                    }
-
-                    // World data
-                    data->object_list[count].position.x = p.position.x;
-                    data->object_list[count].position.y = p.position.y;
-                    data->object_list[count].position.z = p.position.z;
-
-                    data->object_list[count].velocity.x = p.velocity.x;
-                    data->object_list[count].velocity.y = p.velocity.y;
-                    data->object_list[count].velocity.z = p.velocity.z;
-
-                    data->object_list[count].dimensions.x = p.dimensions.x;
-                    data->object_list[count].dimensions.y = p.dimensions.y;
-                    data->object_list[count].dimensions.z = p.dimensions.z;
-                    
-                    data->object_list[count].head_position.x = p.head_position.x;
-                    data->object_list[count].head_position.y = p.head_position.y;
-                    data->object_list[count].head_position.z = p.head_position.z;
-
-                    // 3D Bounding box in world frame
-                    for (int m = 0; m < 8; m++) {
-                        if (m < p.bounding_box.size()) {
-                            data->object_list[count].bounding_box[m].x = p.bounding_box.at(m).x;
-                            data->object_list[count].bounding_box[m].y = p.bounding_box.at(m).y;
-                            data->object_list[count].bounding_box[m].z = p.bounding_box.at(m).z;
-                        }
-                    }
-                    count++;
-                }
-            }
+    if (!isNull()) {
+        sl::Objects objects;
+        cuCtxSetCurrent(zed.getCUDAContext());
+        sl::CustomObjectDetectionRuntimeParameters runtime_params;
+        convert(_objruntimeparams->object_detection_properties, runtime_params.object_detection_properties);
+        for (unsigned int i = 0; i < _objruntimeparams->number_custom_detection_properties; ++i) {
+            convert(_objruntimeparams->object_class_detection_properties[i],
+                    runtime_params.object_class_detection_properties[_objruntimeparams->object_class_detection_properties[i].class_id]);
+        }        sl::ERROR_CODE v = zed.retrieveObjects(objects, runtime_params, instance_id);
+        if (v == sl::ERROR_CODE::SUCCESS) {
+            convertObjects(objects, current_object_detection_model, data);
         }
         return v;
     }
@@ -2128,6 +2225,8 @@ sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_BodyTrackingRuntimePar
             int size_objects = bodies.body_list.size();
             data->timestamp = bodies.timestamp;
             data->nb_bodies = size_objects;
+			data->body_format = (SL_BODY_FORMAT)bodies.body_format;
+			data->inference_precision_mode = (enum SL_INFERENCE_PRECISION)bodies.inference_precision_mode;
 
             int count = 0;
 

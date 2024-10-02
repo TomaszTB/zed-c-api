@@ -80,7 +80,20 @@ public:
     \param nb_cameras the size of the aray of SL_FusionConfiguration
     \note Empty if no data were found for the requested camera.
      */
-    void readFusionConfigFile(char json_config_filename[256], enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration* configs,int& nb_cameras);
+    void readFusionConfigFile(const char* json_config_filename, enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration configs[MAX_FUSED_CAMERAS],int& nb_cameras);
+
+    /**
+    \brief Read a Configuration JSON string to configure a fusion process.
+    \param fusion_configuration : The string containing the configuration (it will be parsed like a json).
+    \param file_size : size of the configuration file.
+    \param coord_sys : The COORDINATE_SYSTEM in which you want the World Pose to be in.
+    \param unit : The UNIT in which you want the World Pose to be in.
+
+    \return A vector of \ref FusionConfiguration for all the camera present in the file.
+    \note Empty if no data were found for the requested camera.
+     */
+    void readFusionConfig(const char* json_config_filename, enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration configs[MAX_FUSED_CAMERAS], int& nb_cameras);
+
 
     /////////////////////////////////////////////////////////////////////
     ///////////////////// Object Detection Fusion ///////////////////////
