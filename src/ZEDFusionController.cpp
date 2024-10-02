@@ -28,10 +28,10 @@ SL_FUSION_ERROR_CODE ZEDFusionController::init(struct SL_InitFusionParameters* i
 	init_params.coordinate_units = (sl::UNIT)init_parameters->coordinate_units;
 	init_params.output_performance_metrics = init_parameters->output_performance_metrics;
 	init_params.verbose = init_parameters->verbose;
-	if (init_parameters->timeout_period_number > 0)
-	{
-		init_params.timeout_period_number = init_parameters->timeout_period_number;
-	}
+	init_params.synchronization_parameters.windows_size = init_parameters->synchronization_parameters.windows_size;
+	init_params.synchronization_parameters.data_source_timeout = init_parameters->synchronization_parameters.data_source_timeout;
+	init_params.synchronization_parameters.keep_last_data = init_parameters->synchronization_parameters.keep_last_data;
+	init_params.synchronization_parameters.maximum_lateness = init_parameters->synchronization_parameters.maximum_lateness;
 
 	sl::FUSION_ERROR_CODE err = fusion.init(init_params);
 
@@ -114,7 +114,7 @@ SL_FUSION_ERROR_CODE ZEDFusionController::retrieveBodies(struct SL_Bodies* data,
 	sdk_uuid.sn = uuid.sn;
 
 	sl::Bodies bodies;
-	sl::FUSION_ERROR_CODE v = fusion.retrieveBodies(bodies, bt_rt);
+	sl::FUSION_ERROR_CODE v = fusion.retrieveBodies(bodies, bt_rt, sdk_uuid);
 	if (v == sl::FUSION_ERROR_CODE::SUCCESS) {
 		data->is_new = (int)bodies.is_new;
 
@@ -122,6 +122,8 @@ SL_FUSION_ERROR_CODE ZEDFusionController::retrieveBodies(struct SL_Bodies* data,
 		int size_objects = bodies.body_list.size();
 		data->timestamp = bodies.timestamp;
 		data->nb_bodies = size_objects;
+		data->body_format = (SL_BODY_FORMAT)bodies.body_format;
+		data->inference_precision_mode = (SL_INFERENCE_PRECISION)bodies.inference_precision_mode;
 
 		int count = 0;
 
@@ -281,7 +283,7 @@ SL_SENDER_ERROR_CODE ZEDFusionController::getSenderState(struct SL_CameraIdentif
 	return err;
 }
 
-inline void sliptIP(std::string ipAdd, std::string& ip, unsigned short& port) {
+inline void splitIP(std::string ipAdd, std::string& ip, unsigned short& port) {
 	std::size_t found_port = ipAdd.find_last_of(":");
 	ip = ipAdd;
 	port = 30000;
@@ -294,45 +296,63 @@ inline void sliptIP(std::string ipAdd, std::string& ip, unsigned short& port) {
 inline SL_InputType getInput(sl::InputType::INPUT_TYPE type, sl::String conf) {
 	SL_InputType input;
 
-	switch (type) {
-	case sl::InputType::INPUT_TYPE::USB_ID:
-		input.id = atoi(conf.c_str());
-		input.input_type = SL_INPUT_TYPE_USB;
-		input.serial_number = 0;
-		break;
-	case sl::InputType::INPUT_TYPE::GMSL_ID:
-		input.id = atoi(conf.c_str());
-		input.input_type = SL_INPUT_TYPE_GMSL;
-		input.serial_number = 0;
-		break;
-	case sl::InputType::INPUT_TYPE::GMSL_SERIAL:
-		input.serial_number = atoi(conf.c_str());
-		input.input_type = SL_INPUT_TYPE_GMSL;
-		break;
-	case sl::InputType::INPUT_TYPE::USB_SERIAL:
-		input.serial_number = atoi(conf.c_str());
-		input.input_type = SL_INPUT_TYPE_USB;
-		break;
-	case sl::InputType::INPUT_TYPE::STREAM: {
-		std::string IP_add;
-		unsigned short port;
-		sliptIP(std::string(conf.c_str()), IP_add, port);
-		strcpy(input.stream_input_ip, IP_add.c_str());
-		input.stream_input_port = port;
-		input.input_type = SL_INPUT_TYPE_STREAM;
-
-	} break;
-	case sl::InputType::INPUT_TYPE::SVO_FILE:
-		strcpy(input.svo_input_filename, conf.c_str());
-		input.input_type = SL_INPUT_TYPE_SVO;
-		break;
-	}
+    switch (type) 
+    {
+		case sl::InputType::INPUT_TYPE::GMSL_ID:
+		{
+			int id = atoi(conf.c_str());
+			input.id = id;
+			input.input_type = SL_INPUT_TYPE_GMSL;
+			input.serial_number = 0;
+			break;
+		}
+		case sl::InputType::INPUT_TYPE::GMSL_SERIAL:
+		{
+			int serialNumber = atoi(conf.c_str());
+			input.serial_number = serialNumber;
+			input.input_type = SL_INPUT_TYPE_GMSL;
+			break;
+		}
+		case sl::InputType::INPUT_TYPE::USB_SERIAL:
+		{
+			int serialNumber = atoi(conf.c_str());
+			input.serial_number = serialNumber;
+			input.input_type = SL_INPUT_TYPE_USB;
+			break;
+		}
+		case sl::InputType::INPUT_TYPE::STREAM:
+		{
+			std::string IP_add;
+			unsigned short port;
+			splitIP(std::string(conf.c_str()), IP_add, port);
+			strcpy(input.stream_input_ip, IP_add.c_str());
+			input.stream_input_port = port;
+			input.input_type = SL_INPUT_TYPE_STREAM;
+			break;
+		}
+		case sl::InputType::INPUT_TYPE::SVO_FILE:
+		{
+			strcpy(input.svo_input_filename, conf.c_str());
+			input.input_type = SL_INPUT_TYPE_SVO;
+			break;
+		}
+		default:
+		case sl::InputType::INPUT_TYPE::USB_ID:
+		{
+			int id = atoi(conf.c_str());
+			input.id = id;
+			input.input_type = SL_INPUT_TYPE_USB;
+			input.serial_number = 0;
+			break;
+		}
+    }
 	return input;
 }
 
-void ZEDFusionController::readFusionConfigFile(char json_config_filename[256], enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration* configs, int& nb_cameras)
+void ZEDFusionController::readFusionConfigFile(const char* json_config_filename, enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration configs[MAX_FUSED_CAMERAS], int& nb_cameras)
 {
-	auto sdk_configs = sl::readFusionConfigurationFile(std::string(json_config_filename), (sl::COORDINATE_SYSTEM)coord_system, (sl::UNIT)unit);
+	std::string filepath = std::string(json_config_filename);
+	auto sdk_configs = sl::readFusionConfigurationFile(filepath, (sl::COORDINATE_SYSTEM)coord_system, (sl::UNIT)unit);
 
 	nb_cameras = std::min(MAX_FUSED_CAMERAS, (int)sdk_configs.size());
 
@@ -370,10 +390,61 @@ void ZEDFusionController::readFusionConfigFile(char json_config_filename[256], e
 	}
 }
 
+void ZEDFusionController::readFusionConfig(const char* fusion_configuration, enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration configs[MAX_FUSED_CAMERAS], int& nb_cameras)
+{
+	std::string file = std::string(fusion_configuration);
+	auto sdk_configs = sl::readFusionConfiguration(file, (sl::COORDINATE_SYSTEM)coord_system, (sl::UNIT)unit);
+
+	nb_cameras = std::min(MAX_FUSED_CAMERAS, (int)sdk_configs.size());
+
+	for (int i = 0; i < sdk_configs.size(); i++)
+	{
+		if (i < MAX_FUSED_CAMERAS)
+		{
+			sl::FusionConfiguration sdk_config = sdk_configs[i];
+
+			SL_FusionConfiguration fusion_config;
+			memset(&fusion_config, 0, sizeof(SL_FusionConfiguration));
+
+			fusion_config.serial_number = sdk_config.serial_number;
+			SL_Vector3 position;
+			position.x = sdk_config.pose.getTranslation().x;
+			position.y = sdk_config.pose.getTranslation().y;
+			position.z = sdk_config.pose.getTranslation().z;
+			SL_Quaternion rotation;
+			rotation.x = sdk_config.pose.getOrientation().x;
+			rotation.y = sdk_config.pose.getOrientation().y;
+			rotation.z = sdk_config.pose.getOrientation().z;
+			rotation.w = sdk_config.pose.getOrientation().w;
+
+			fusion_config.position = position;
+			fusion_config.rotation = rotation;
+
+			fusion_config.input_type = getInput(sdk_config.input_type.getType(), sdk_config.input_type.getConfiguration());
+			fusion_config.comm_param.communication_type = (SL_COMM_TYPE)sdk_config.communication_parameters.getType();
+			strcpy(&fusion_config.comm_param.ip_add[0], sdk_config.communication_parameters.getIpAddress().c_str());
+			fusion_config.comm_param.ip_port = sdk_config.communication_parameters.getPort();
+
+			configs[i] = fusion_config;
+		}
+	}
+}
+
 SL_FUSION_ERROR_CODE ZEDFusionController::enablePositionalTracking(struct SL_PositionalTrackingFusionParameters* params)
 {	
 	sl::PositionalTrackingFusionParameters sdk_params;
 	sdk_params.enable_GNSS_fusion = params->enable_GNSS_fusion;
+	sdk_params.set_gravity_as_origin = params->set_gravity_as_origin;
+
+	sl::float3 translation(params->base_footprint_to_world_translation.x, params->base_footprint_to_world_translation.y, params->base_footprint_to_world_translation.z);
+	sl::float4 orientation(params->base_footprint_to_world_rotation.x, params->base_footprint_to_world_rotation.y, params->base_footprint_to_world_rotation.z, params->base_footprint_to_world_rotation.w);
+	sdk_params.base_footprint_to_world_transform.setTranslation(translation);
+	sdk_params.base_footprint_to_world_transform.setOrientation(orientation);
+
+	sl::float3 translation_(params->base_footprint_to_baselink_translation.x, params->base_footprint_to_baselink_translation.y, params->base_footprint_to_baselink_translation.z);
+	sl::float4 orientation_(params->base_footprint_to_baselink_rotation.x, params->base_footprint_to_baselink_rotation.y, params->base_footprint_to_baselink_rotation.z, params->base_footprint_to_baselink_rotation.w);
+	sdk_params.base_footprint_to_baselink_transform.setTranslation(translation_);
+	sdk_params.base_footprint_to_baselink_transform.setOrientation(orientation_);
 
 	memcpy(&sdk_params.gnss_calibration_parameters, &params->gnss_calibration_parameters, sizeof(SL_GNSSCalibrationParameters));
 

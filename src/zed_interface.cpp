@@ -1302,9 +1302,18 @@ extern "C" {
         return sdk_id.size();
     }
 
-    INTERFACE_API int sl_ingest_custom_box_objects(int c_id, int nb_objects, struct SL_CustomBoxObjectData* objects_in) {
+    INTERFACE_API int sl_ingest_custom_box_objects(int c_id, int nb_objects, struct SL_CustomBoxObjectData* objects_in, unsigned int instance_id) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->ingestCustomBoxObjectData(nb_objects, objects_in);
+            return (int)ZEDController::get(c_id)->ingestCustomBoxObjectData(nb_objects, objects_in, instance_id);
+        }
+        else {
+            return (int)sl::ERROR_CODE::FAILURE;
+        }
+    }
+
+    INTERFACE_API int sl_ingest_custom_mask_objects(int c_id, int nb_objects, struct SL_CustomMaskObjectData* objects_in, unsigned int instance_id) {
+        if (!ZEDController::get(c_id)->isNull()) {
+            return (int)ZEDController::get(c_id)->ingestCustomMaskObjectData(nb_objects, objects_in, instance_id);
         }
         else {
             return (int)sl::ERROR_CODE::FAILURE;
@@ -1314,6 +1323,14 @@ extern "C" {
     INTERFACE_API int sl_retrieve_objects(int camera_id, struct SL_ObjectDetectionRuntimeParameters* object_detection_runtime_parameters, struct SL_Objects* objects, unsigned int instance_id) {
         if (!ZEDController::get(camera_id)->isNull()) {
             return (int)ZEDController::get(camera_id)->retrieveObjectDetectionData(object_detection_runtime_parameters, objects, instance_id);
+        }
+        else
+            return (int)sl::ERROR_CODE::FAILURE;
+    }
+
+    INTERFACE_API int sl_retrieve_custom_objects(int camera_id, struct SL_CustomObjectDetectionRuntimeParameters* object_detection_runtime_parameters, struct SL_Objects* objects, unsigned int instance_id) {
+        if (!ZEDController::get(camera_id)->isNull()) {
+            return (int)ZEDController::get(camera_id)->retrieveCustomObjectDetectionData(object_detection_runtime_parameters, objects, instance_id);
         }
         else
             return (int)sl::ERROR_CODE::FAILURE;
@@ -1487,11 +1504,18 @@ extern "C" {
         }
     }
 
-    INTERFACE_API void sl_fusion_read_configuration_file(char json_config_filename[256], enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration* configs, int* nb_cameras)
+    INTERFACE_API void sl_fusion_read_configuration_file(const char* json_config_filename, enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration configs[MAX_FUSED_CAMERAS], int* nb_cameras)
     {
         if (!ZEDFusionController::get()->isNotCreated())
         {
             ZEDFusionController::get()->readFusionConfigFile(json_config_filename, coord_system, unit, configs, *nb_cameras);
+        }
+    }
+    INTERFACE_API void sl_fusion_read_configuration(const char* fusion_configuration, enum SL_COORDINATE_SYSTEM coord_system, enum SL_UNIT unit, struct SL_FusionConfiguration configs[MAX_FUSED_CAMERAS], int* nb_cameras)
+    {
+        if (!ZEDFusionController::get()->isNotCreated())
+        {
+            ZEDFusionController::get()->readFusionConfig(fusion_configuration, coord_system, unit, configs, *nb_cameras);
         }
     }
 
@@ -1548,7 +1572,7 @@ extern "C" {
         }
     }
 
-    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_position(SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame, enum SL_UNIT unit,
+    INTERFACE_API enum SL_POSITIONAL_TRACKING_STATE sl_fusion_get_position(SL_PoseData* pose, enum SL_REFERENCE_FRAME reference_frame,
         struct SL_CameraIdentifier* uuid, enum SL_POSITION_TYPE retrieve_type)
     {
         if (!ZEDFusionController::get()->isNotCreated())
