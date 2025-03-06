@@ -30,10 +30,11 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11")
 
 if (MSVC)
+	add_compile_options(/permissive-)
 else ()
 	SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-	add_definitions(-std=c++0x -O3 -fPIC -fpermissive)
+	add_definitions(-std=c++0x -O3 -fPIC)
 endif(MSVC)
 
 add_library(${PROJECT_NAME_INTERFACEC} ${LIB_TYPE} ${SRCS_RS} ${HDRS_RS})

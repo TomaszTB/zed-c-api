@@ -419,7 +419,7 @@ extern "C" {
 
     INTERFACE_API char* sl_get_sdk_version() {
         std::string s = std::string(sl::Camera::getSDKVersion().c_str());
-        char* res = (char*)malloc(s.size());
+        char* res = (char*)malloc(s.size() + 1);
         strncpy(res, s.c_str(), s.size());
         res[s.size()] = '\0';
         return res;
@@ -497,6 +497,13 @@ extern "C" {
             return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
 
+    INTERFACE_API int sl_read(int c_id) {
+        if (!ZEDController::get(c_id)->isNull())
+            return (int)ZEDController::get(c_id)->zed.read();
+        else
+            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+    }
+
     INTERFACE_API void sl_get_device_list(struct SL_DeviceProperties device_list[MAX_CAMERA_PLUGIN], int* nbDevices) {
 
         std::vector<sl::DeviceProperties> devices = sl::Camera::getDeviceList();
@@ -509,7 +516,24 @@ extern "C" {
                 device.id = devices[i].id;
                 device.sn = devices[i].serial_number;
                 device.input_type = (SL_INPUT_TYPE)devices[i].input_type;
+                device.i2c_port = devices[i].i2c_port;
+				device.sensor_address_left = devices[i].sensor_address_left;
+				device.sensor_address_right = devices[i].sensor_address_right;
                 memcpy(device.path, devices[i].path, 512 * sizeof(char));
+
+                device.camera_badge = (char*)malloc(devices[i].camera_badge.size() + 1);
+                strncpy(device.camera_badge, devices[i].camera_badge.c_str(), devices[i].camera_badge.size());
+                device.camera_badge[devices[i].camera_badge.size()] = '\0';
+
+                device.camera_sensor_model = (char*)malloc(devices[i].camera_sensor_model.size() + 1);
+                strncpy(device.camera_sensor_model, devices[i].camera_sensor_model.c_str(), devices[i].camera_sensor_model.size());
+                device.camera_sensor_model[devices[i].camera_sensor_model.size()] = '\0';
+                device.camera_name = (char*)malloc(devices[i].camera_name.size() + 1);
+                strncpy(device.camera_sensor_model, devices[i].camera_name.c_str(), devices[i].camera_name.size());
+                device.camera_name[devices[i].camera_name.size()] = '\0';
+
+                memcpy(&device.identifier[0], &devices[i].identifier, sizeof(unsigned char) * 3);
+
                 device_list[i] = device;
             }
         }
@@ -596,7 +620,7 @@ extern "C" {
             return -1;
     }
 
-    INTERFACE_API enum SL_ERROR_CODE sl_retrieve_svo_data(int c_id, char key[128], int nb_data, struct SL_SVOData* data, unsigned long long ts_begin, unsigned long long ts_end)
+    INTERFACE_API enum SL_ERROR_CODE sl_retrieve_svo_data(int c_id, char* key, int nb_data, struct SL_SVOData** data, unsigned long long ts_begin, unsigned long long ts_end)
     {
         if (!ZEDController::get(c_id)->isNull()) {
             return (SL_ERROR_CODE)ZEDController::get(c_id)->retrieveSVOData(key, nb_data, data, ts_begin, ts_end);
@@ -614,7 +638,7 @@ extern "C" {
             return -1;
     }
 
-    INTERFACE_API void sl_get_svo_data_keys(int c_id, int nb_keys, char* keys[128])
+    INTERFACE_API void sl_get_svo_data_keys(int c_id, int nb_keys, char** keys)
     {
         if (!ZEDController::get(c_id)->isNull()) {
             ZEDController::get(c_id)->getSVODataKeys(nb_keys, keys);
@@ -809,6 +833,34 @@ extern "C" {
             return (SL_ERROR_CODE)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
 
+    INTERFACE_API struct SL_HealthStatus* sl_get_health_status(int camera_id)
+    {
+        if (!ZEDController::get(camera_id)->isNull()) {
+
+            return ZEDController::get(camera_id)->getHealthStatus();
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    INTERFACE_API struct SL_Resolution* sl_get_retrieve_image_resolution(int camera_id, struct SL_Resolution* res)
+    {
+		if (!ZEDController::get(camera_id)->isNull())
+			return ZEDController::get(camera_id)->getRetrieveImageResolution(res);
+		else
+			return nullptr;
+    }
+
+    INTERFACE_API struct SL_Resolution* sl_get_retrieve_measure_resolution(int camera_id, struct SL_Resolution* res)
+    {
+		if (!ZEDController::get(camera_id)->isNull())
+			return ZEDController::get(camera_id)->getRetrieveMeasureResolution(res);
+		else
+			return nullptr;
+	}
+
 
     ///////////////////////// DEPTH ////////////////////////////////
 
@@ -863,8 +915,7 @@ extern "C" {
 
     INTERFACE_API int sl_enable_positional_tracking(int c_id, SL_PositionalTrackingParameters* tracking_param, const char* area_path) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->enableTracking(&tracking_param->initial_world_rotation, &tracking_param->initial_world_position, tracking_param->enable_area_memory, tracking_param->enable_pose_smothing, tracking_param->set_floor_as_origin,
-                tracking_param->set_as_static, tracking_param->enable_imu_fusion, tracking_param->depth_min_range, tracking_param->set_gravity_as_origin, tracking_param->mode, area_path);
+            return (int)ZEDController::get(c_id)->enableTracking(tracking_param, area_path);
         }
         else
             return (int)SL_ERROR_CODE_CAMERA_NOT_INITIALIZED;
@@ -908,6 +959,22 @@ extern "C" {
             return (int)ZEDController::get(c_id)->getPoseArray(pose, (int)mat_type);
         else
             return (int)sl::POSITIONAL_TRACKING_STATE::OFF;
+    }
+
+    INTERFACE_API int sl_get_positional_tracking_landmarks(int camera_id, struct SL_Landmark** landmarks, uint32_t* count)
+    {
+		if (!ZEDController::get(camera_id)->isNull())
+			return (int)ZEDController::get(camera_id)->getPositionalTrackingLandmarks(landmarks, count);
+		else
+			return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+    }
+
+    INTERFACE_API int sl_get_positional_tracking_landmarks_2d(int camera_id, struct SL_Landmark2D** landmarks, uint32_t* count)
+    {
+        if (!ZEDController::get(camera_id)->isNull())
+            return (int)ZEDController::get(camera_id)->getPositionalTrackingLandmarks2d(landmarks, count);
+        else
+            return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
     }
 
     INTERFACE_API struct SL_PositionalTrackingStatus* sl_get_positional_tracking_status(int c_id)
@@ -1702,16 +1769,16 @@ extern "C" {
 	}
 
     /***************************MAT*************************/
-    INTERFACE_API int sl_retrieve_measure(int c_id, void* ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height) {
+    INTERFACE_API int sl_retrieve_measure(int c_id, void* ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height, cudaStream_t custream) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->zed.retrieveMeasure(*MAT, (sl::MEASURE)type, (sl::MEM)(mem + 1), sl::Resolution(width, height));
+            return (int)ZEDController::get(c_id)->zed.retrieveMeasure(*MAT, (sl::MEASURE)type, (sl::MEM)(mem + 1), sl::Resolution(width, height), custream);
         }
         return (int)sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
 
-    INTERFACE_API int sl_retrieve_image(int c_id, void* ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height) {
+    INTERFACE_API int sl_retrieve_image(int c_id, void* ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height, cudaStream_t custream) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->zed.retrieveImage(*MAT, (sl::VIEW)type, (sl::MEM)(mem + 1), sl::Resolution(width, height));
+            return (int)ZEDController::get(c_id)->zed.retrieveImage(*MAT, (sl::VIEW)type, (sl::MEM)(mem + 1), sl::Resolution(width, height), custream);
         }
         return (int)sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
@@ -1981,6 +2048,75 @@ extern "C" {
 
     INTERFACE_API void sl_mat_swap(void* ptr_1, void* ptr_2) {
         sl::Mat::swap(*(sl::Mat*)ptr_1, *(sl::Mat*)ptr_2);
+    }
+
+    /**
+    \brief Convert the color channels of the Mat into another Mat
+     * This methods works only on 8U_C4 if remove_alpha_channels is enabled, or 8U_C4 and 8U_C3 if swap_RB_channels is enabled
+     * The inplace method sl::Mat::convertColor can be used for only swapping the Red and Blue channel efficiently
+     */
+    INTERFACE_API int sl_mat_convert_color(void* ptr, enum SL_MEM memory, bool swap_RB_channels, cudaStream_t stream)
+    {
+		return (int)MAT->convertColor((sl::MEM)(memory + 1), stream, swap_RB_channels);
+    }
+
+    /**
+    \brief Convert the color channels of the Mat (RGB<->BGR or RGBA<->BGRA)
+     * This methods works only on 8U_C4 or 8U_C3
+     */
+    INTERFACE_API int sl_convert_color(void* mat1, void* mat2, bool swap_RB_channels, bool remove_alpha_channels, enum SL_MEM memory, cudaStream_t stream)
+    {
+		return (int)sl::Mat::convertColor(*(sl::Mat*)mat1, *(sl::Mat*)mat2, swap_RB_channels, remove_alpha_channels, (sl::MEM)(memory + 1), stream);
+    }
+
+    /**
+    \brief Convert an image into a GPU Tensor in planar channel configuration (NCHW), ready to use for deep learning model
+    \param image_in : input image to convert
+    \param tensor_out : output GPU tensor
+    \param resolution_out : resolution of the output image, generally square, although not mandatory
+    \param scalefactor : Scale factor applied to each pixel value, typically to convert the char value into [0-1] float
+    \param mean : mean, statistic to normalized the pixel values, applied AFTER the scale. For instance for imagenet statistics the mean would be sl::float3(0.485, 0.456, 0.406)
+    \param stddev : standard deviation, statistic to normalized the pixel values, applied AFTER the scale. For instance for imagenet statistics the standard deviation would be sl::float3(0.229, 0.224, 0.225)
+    \param keep_aspect_ratio : indicates if the original width and height ratio should be kept using padding (sometimes refer to as letterboxing) or if the image should be stretched
+    \param swap_RB_channels : indicates if the Red and Blue channels should be swapped (RGB<->BGR or RGBA<->BGRA)
+    \param stream : a cuda stream to put the compute
+     */
+	INTERFACE_API int sl_blob_from_image(void* ptr, void* tensor_out, struct SL_Resolution resolution_out, 
+        float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels, 
+        cudaStream_t stream)
+	{
+		return (int)sl::blobFromImage(*MAT, *(sl::Mat*)tensor_out, sl::Resolution(resolution_out.width, resolution_out.height), 
+            scalefactor, sl::float3(mean.x, mean.y, mean.z), 
+            sl::float3(stddev.x, stddev.y, stddev.z), 
+            keep_aspect_ratio, swap_RB_channels, stream);
+    }
+
+    /**
+    \brief Convert an image array into a GPU Tensor in planar channel configuration (NCHW), ready to use for deep learning model
+    \param image_in : input images to convert
+    \param tensor_out : output GPU tensor
+    \param resolution_out : resolution of the output image, generally square, although not mandatory
+    \param scalefactor : Scale factor applied to each pixel value, typically to convert the char value into [0-1] float
+    \param mean : mean, statistic to normalized the pixel values, applied AFTER the scale. For instance for imagenet statistics the mean would be sl::float3(0.485, 0.456, 0.406)
+    \param stddev : standard deviation, statistic to normalized the pixel values, applied AFTER the scale. For instance for imagenet statistics the standard deviation would be sl::float3(0.229, 0.224, 0.225)
+    \param keep_aspect_ratio : indicates if the original width and height ratio should be kept using padding (sometimes refer to as letterboxing) or if the image should be stretched
+    \param swap_RB_channels : indicates if the Red and Blue channels should be swapped (RGB<->BGR or RGBA<->BGRA)
+    \param stream : a cuda stream to put the compute
+     */
+    INTERFACE_API int sl_blob_from_images(void** array_ptr, int nb_images, void* tensor_out, struct SL_Resolution resolution_out,
+        float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels,
+        cudaStream_t stream)
+    {
+        std::vector<sl::Mat> array(nb_images);
+		for (int i = 0; i < nb_images; i++) {
+			array[i] = *(sl::Mat*)array_ptr[i];
+		}
+		int res = (int)sl::blobFromImages(array, *(sl::Mat*)tensor_out, sl::Resolution(resolution_out.width, resolution_out.height),
+			scalefactor, sl::float3(mean.x, mean.y, mean.z),
+			sl::float3(stddev.x, stddev.y, stddev.z),
+			keep_aspect_ratio, swap_RB_channels, stream);
+
+		return res;
     }
 
 #ifdef __cplusplus

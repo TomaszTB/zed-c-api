@@ -4,6 +4,13 @@
 
 #include <sl/Camera.hpp>
 
+inline float makeQuietNaN() {
+    uint32_t nan_bits = 0x7FC00000; // IEEE-754 quiet NaN for float
+    float qnan;
+    memcpy(&qnan, &nan_bits, sizeof(qnan));
+    return qnan;
+}
+
 inline bool checkKPvalidity(sl::float3 &kp, double render_threshold) {
     return (std::isnormal(kp.z) && kp.z > render_threshold);
 }
@@ -53,6 +60,32 @@ sl::float3 ZEDController::getGravityEstimation() {
     return mesh.getGravityEstimate();
 }
 
+static void copy_init_parameters(sl::InitParameters & sdk_parmeters, SL_InitParameters* init_parameters, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path)
+{
+    sdk_parmeters.camera_resolution = (sl::RESOLUTION)init_parameters->resolution;
+    sdk_parmeters.camera_fps = init_parameters->camera_fps;
+    sdk_parmeters.depth_minimum_distance = init_parameters->depth_minimum_distance;
+    sdk_parmeters.depth_mode = (sl::DEPTH_MODE)init_parameters->depth_mode;
+    sdk_parmeters.coordinate_system = (sl::COORDINATE_SYSTEM)init_parameters->coordinate_system;
+    sdk_parmeters.coordinate_units = (sl::UNIT)init_parameters->coordinate_unit;
+    sdk_parmeters.camera_image_flip = init_parameters->camera_image_flip;
+    sdk_parmeters.camera_disable_self_calib = init_parameters->camera_disable_self_calib;
+    sdk_parmeters.enable_right_side_measure = init_parameters->enable_right_side_measure;
+    sdk_parmeters.depth_stabilization = init_parameters->depth_stabilization;
+    sdk_parmeters.sdk_verbose_log_file = output_file;
+    sdk_parmeters.sdk_verbose = init_parameters->sdk_verbose;
+    sdk_parmeters.optional_settings_path = opt_settings_path;
+    sdk_parmeters.sensors_required = init_parameters->sensors_required;
+    sdk_parmeters.enable_image_enhancement = init_parameters->enable_image_enhancement;
+    sdk_parmeters.depth_maximum_distance = init_parameters->depth_maximum_distance;
+    sdk_parmeters.optional_opencv_calibration_file = opencv_calib_path;
+    sdk_parmeters.open_timeout_sec = init_parameters->open_timeout_sec;
+    sdk_parmeters.async_grab_camera_recovery = init_parameters->async_grab_camera_recovery;
+    sdk_parmeters.grab_compute_capping_fps = init_parameters->grab_compute_capping_fps;
+    sdk_parmeters.enable_image_validity_check = init_parameters->enable_image_validity_check;
+    sdk_parmeters.maximum_working_resolution = sl::Resolution(init_parameters->maximum_working_resolution.width, init_parameters->maximum_working_resolution.height);
+}
+
 int ZEDController::initFromUSB(SL_InitParameters *params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path) {
 
     char buffer_verbose[2048];
@@ -61,34 +94,16 @@ int ZEDController::initFromUSB(SL_InitParameters *params, const unsigned int ser
         return 0;
     }
     sprintf(buffer_verbose, "ENTER ZEDController::initFromUSB %d = %d", params->camera_device_id, camera_ID);
-	initParams.camera_resolution = (sl::RESOLUTION)params->resolution;
+
+    copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
+
 	if (serial_number > 0) {
 		initParams.input.setFromSerialNumber(serial_number);
 	}
 	else {
 		initParams.input.setFromCameraID(params->camera_device_id);
 	}
-    initParams.camera_fps = params->camera_fps;
-    initParams.depth_minimum_distance = params->depth_minimum_distance;
-    initParams.depth_mode = (sl::DEPTH_MODE)params->depth_mode;
-    initParams.coordinate_system = (sl::COORDINATE_SYSTEM)params->coordinate_system;
-    initParams.coordinate_units = (sl::UNIT)params->coordinate_unit;
-    initParams.camera_image_flip = params->camera_image_flip;
-    initParams.camera_disable_self_calib = params->camera_disable_self_calib;
-    initParams.enable_right_side_measure = params->enable_right_side_measure;
-    initParams.depth_stabilization = params->depth_stabilization;
-    initParams.sdk_verbose_log_file = output_file;
-    initParams.sdk_verbose = params->sdk_verbose;
-    initParams.optional_settings_path = opt_settings_path;
-    initParams.sensors_required = params->sensors_required;
-    initParams.enable_image_enhancement = params->enable_image_enhancement;
-    initParams.depth_maximum_distance = params->depth_maximum_distance;
-    initParams.optional_opencv_calibration_file = opencv_calib_path;
-	initParams.open_timeout_sec = params->open_timeout_sec;
-    initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
-    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
-    initParams.enable_image_validity_check = params->enable_image_validity_check;
-    return open();
+   return open();
 
 }
 
@@ -107,27 +122,8 @@ int ZEDController::initFromSVO(SL_InitParameters *params, const char* path_svo, 
         return (int) sl::ERROR_CODE::INVALID_SVO_FILE;
     }
 
-    initParams.depth_minimum_distance = params->depth_minimum_distance;
-    initParams.depth_mode = (sl::DEPTH_MODE)params->depth_mode;
-    initParams.coordinate_system = (sl::COORDINATE_SYSTEM)params->coordinate_system;
-    initParams.coordinate_units = (sl::UNIT)params->coordinate_unit;
-    initParams.camera_image_flip = params->camera_image_flip;
-    initParams.camera_disable_self_calib = params->camera_disable_self_calib;
-    initParams.enable_right_side_measure = params->enable_right_side_measure;
-    initParams.depth_stabilization = params->depth_stabilization;
-    initParams.svo_real_time_mode = params->svo_real_time_mode;
+	copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
     initParams.input.setFromSVOFile(sl::String(path_svo));
-    initParams.sdk_verbose_log_file = output_file;
-    initParams.sdk_verbose = params->sdk_verbose;
-    initParams.optional_settings_path = opt_settings_path;
-    initParams.sensors_required = params->sensors_required;
-    initParams.enable_image_enhancement = params->enable_image_enhancement;
-    initParams.depth_maximum_distance = params->depth_maximum_distance;
-    initParams.optional_opencv_calibration_file = opencv_calib_path;
-	initParams.open_timeout_sec = params->open_timeout_sec;
-    initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
-    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
-    initParams.enable_image_validity_check = params->enable_image_validity_check;
     return open();
 }
 
@@ -145,29 +141,9 @@ int ZEDController::initFromStream(SL_InitParameters *params, const char* ip, int
     }
 
     sprintf(buffer_verbose, "ENTER ZEDController::initFromStream %s:%d  = %d", ip, port, camera_ID);
-    initParams.camera_resolution = (sl::RESOLUTION)params->resolution;
-    initParams.input.setFromStream(sl::String(ip), (unsigned short) port);
-    initParams.camera_fps = params->camera_fps;
-    initParams.depth_minimum_distance = params->depth_minimum_distance;
-    initParams.depth_mode = (sl::DEPTH_MODE)params->depth_mode;
-    initParams.coordinate_system = (sl::COORDINATE_SYSTEM)params->coordinate_system;
-    initParams.coordinate_units = (sl::UNIT)params->coordinate_unit;
-    initParams.camera_image_flip = params->camera_image_flip;
-    initParams.camera_disable_self_calib = params->camera_disable_self_calib;
-    initParams.enable_right_side_measure = params->enable_right_side_measure;
-    initParams.depth_stabilization = params->depth_stabilization;
-    initParams.sdk_verbose_log_file = output_file;
-    initParams.sdk_verbose = params->sdk_verbose;
-    initParams.optional_settings_path = opt_settings_path;
-    initParams.sensors_required = params->sensors_required;
-    initParams.enable_image_enhancement = params->enable_image_enhancement;
-    initParams.depth_maximum_distance = params->depth_maximum_distance;
-    initParams.optional_opencv_calibration_file = opencv_calib_path;
-	initParams.open_timeout_sec = params->open_timeout_sec;
-    initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
-    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
-    initParams.enable_image_validity_check = params->enable_image_validity_check;
+    copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
 
+    initParams.input.setFromStream(sl::String(ip), (unsigned short)port);
     return open();
 }
 
@@ -186,26 +162,7 @@ int ZEDController::initFromGMSL(SL_InitParameters* params, const unsigned int se
     else {
         initParams.input.setFromCameraID(params->camera_device_id, sl::BUS_TYPE::GMSL);
     }
-    initParams.camera_fps = params->camera_fps;
-    initParams.depth_minimum_distance = params->depth_minimum_distance;
-    initParams.depth_mode = (sl::DEPTH_MODE)params->depth_mode;
-    initParams.coordinate_system = (sl::COORDINATE_SYSTEM)params->coordinate_system;
-    initParams.coordinate_units = (sl::UNIT)params->coordinate_unit;
-    initParams.camera_image_flip = params->camera_image_flip;
-    initParams.camera_disable_self_calib = params->camera_disable_self_calib;
-    initParams.enable_right_side_measure = params->enable_right_side_measure;
-    initParams.depth_stabilization = params->depth_stabilization;
-    initParams.sdk_verbose_log_file = output_file;
-    initParams.sdk_verbose = params->sdk_verbose;
-    initParams.optional_settings_path = opt_settings_path;
-    initParams.sensors_required = params->sensors_required;
-    initParams.enable_image_enhancement = params->enable_image_enhancement;
-    initParams.depth_maximum_distance = params->depth_maximum_distance;
-    initParams.optional_opencv_calibration_file = opencv_calib_path;
-    initParams.open_timeout_sec = params->open_timeout_sec;
-    initParams.async_grab_camera_recovery = params->async_grab_camera_recovery;
-    initParams.grab_compute_capping_fps = params->grab_compute_capping_fps;
-    initParams.enable_image_validity_check = params->enable_image_validity_check;
+    copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
 
     return open();
 
@@ -253,7 +210,6 @@ SL_InitParameters* ZEDController::getInitParameters() {
     initParams->camera_device_id = camera_ID;
     initParams->camera_image_flip = (SL_FLIP_MODE) initParameters.camera_image_flip;
     initParams->camera_disable_self_calib = initParameters.camera_disable_self_calib;
-
     initParams->enable_right_side_measure = initParameters.enable_right_side_measure;
     initParams->svo_real_time_mode = initParameters.svo_real_time_mode;
     initParams->depth_mode = (SL_DEPTH_MODE) initParameters.depth_mode;
@@ -262,21 +218,16 @@ SL_InitParameters* ZEDController::getInitParameters() {
     initParams->depth_minimum_distance = initParameters.depth_minimum_distance;
     initParams->coordinate_unit = (SL_UNIT) initParameters.coordinate_units;
     initParams->coordinate_system = (SL_COORDINATE_SYSTEM) initParameters.coordinate_system;
-
     initParams->sdk_gpu_id = initParameters.sdk_gpu_id;
     initParams->sdk_verbose = initParameters.sdk_verbose;
-
     initParams->sensors_required = initParameters.sensors_required;
     initParams->enable_image_enhancement = initParameters.enable_image_enhancement;
-
 	initParams->open_timeout_sec = initParameters.open_timeout_sec;
-
     initParams->async_grab_camera_recovery = initParameters.async_grab_camera_recovery;
-
     initParams->grab_compute_capping_fps = initParameters.grab_compute_capping_fps;
-
     initParams->enable_image_validity_check = initParameters.enable_image_validity_check;
-
+	initParams->maximum_working_resolution.height = initParameters.maximum_working_resolution.height;
+	initParams->maximum_working_resolution.width = initParameters.maximum_working_resolution.width;
     return initParams;
 }
 
@@ -303,7 +254,7 @@ SL_PositionalTrackingParameters* ZEDController::getPositionalTrackingParameters(
     //c_trackingParams->area_file_path = trackingParams.area_file_path.c_str();
     c_trackingParams->enable_area_memory = trackingParams.enable_area_memory;
     c_trackingParams->enable_imu_fusion = trackingParams.enable_imu_fusion;
-    c_trackingParams->enable_pose_smothing = trackingParams.enable_pose_smoothing;
+    c_trackingParams->enable_pose_smoothing = trackingParams.enable_pose_smoothing;
     sl::Translation t = trackingParams.initial_world_transform.getTranslation();
     SL_Vector3 vec;
     vec.x = t.x;
@@ -323,6 +274,7 @@ SL_PositionalTrackingParameters* ZEDController::getPositionalTrackingParameters(
     c_trackingParams->depth_min_range = trackingParams.depth_min_range;
     c_trackingParams->set_gravity_as_origin = trackingParams.set_gravity_as_origin;
     c_trackingParams->mode = (SL_POSITIONAL_TRACKING_MODE)trackingParams.mode;
+	c_trackingParams->enable_light_computation_mode = trackingParams.enable_light_computation_mode;
     return c_trackingParams;
 }
 
@@ -344,6 +296,28 @@ SL_StreamingParameters* ZEDController::getStreamingParameters() {
 	return c_streamingParams;
 }
 
+SL_HealthStatus* ZEDController::getHealthStatus()
+{
+    SL_HealthStatus* c_healthStatus = new SL_HealthStatus();
+    memset(c_healthStatus, 0, sizeof(SL_HealthStatus));
+
+    sl::HealthStatus health_status = zed.getHealthStatus();
+
+	memcpy(&c_healthStatus, &health_status, sizeof(SL_HealthStatus));
+
+	return c_healthStatus;
+}
+
+SL_Resolution* ZEDController::getRetrieveImageResolution(SL_Resolution* res)
+{
+	return convertResolution(zed.getRetrieveMeasureResolution(sl::Resolution(res->width, res->height)));
+}
+
+SL_Resolution* ZEDController::getRetrieveMeasureResolution(SL_Resolution* res)
+{
+	return convertResolution(zed.getRetrieveMeasureResolution(sl::Resolution(res->width, res->height)));
+}
+
 
 void ZEDController::disableTracking(const char *path) {
     if (!isNull()) {
@@ -352,35 +326,34 @@ void ZEDController::disableTracking(const char *path) {
     }
 }
 
-sl::ERROR_CODE ZEDController::enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin,
-        bool set_as_static, bool enable_imu_fusion, float depth_min_range, bool set_gravity_as_origin, SL_POSITIONAL_TRACKING_MODE mode, const char* area_file_path) {
+sl::ERROR_CODE ZEDController::enableTracking(SL_PositionalTrackingParameters* tracking_params, const char* area_file_path) {
     if (!isNull()) {
         sl::PositionalTrackingParameters params;
         sl::Transform motion;
 
         sl::Translation trans;
-        trans.tx = initial_world_position->x;
-        trans.ty = initial_world_position->y;
-        trans.tz = initial_world_position->z;
+        trans.tx = tracking_params->initial_world_position.x;
+        trans.ty = tracking_params->initial_world_position.y;
+        trans.tz = tracking_params->initial_world_position.z;
         motion.setTranslation(trans);
 
         sl::Orientation orientation;
-        orientation.ox = initial_world_rotation->x;
-        orientation.oy = initial_world_rotation->y;
-        orientation.oz = initial_world_rotation->z;
-        orientation.ow = initial_world_rotation->w;
+        orientation.ox = tracking_params->initial_world_rotation.x;
+        orientation.oy = tracking_params->initial_world_rotation.y;
+        orientation.oz = tracking_params->initial_world_rotation.z;
+        orientation.ow = tracking_params->initial_world_rotation.w;
         motion.setOrientation(orientation);
 
         params.initial_world_transform = motion;
-        params.enable_area_memory = enable_area_memory;
-        params.enable_pose_smoothing = enable_pose_smoothing;
-        params.set_floor_as_origin = set_floor_as_origin;
-        params.set_as_static = set_as_static;
-        params.enable_imu_fusion = enable_imu_fusion;
-        params.depth_min_range = depth_min_range;
-        params.set_gravity_as_origin = set_gravity_as_origin;
-        params.mode = (sl::POSITIONAL_TRACKING_MODE)mode;
-
+        params.enable_area_memory = tracking_params->enable_area_memory;
+        params.enable_pose_smoothing = tracking_params->enable_pose_smoothing;
+        params.set_floor_as_origin = tracking_params->set_floor_as_origin;
+        params.set_as_static = tracking_params->set_as_static;
+        params.enable_imu_fusion = tracking_params->enable_imu_fusion;
+        params.depth_min_range = tracking_params->depth_min_range;
+        params.set_gravity_as_origin = tracking_params->set_gravity_as_origin;
+        params.mode = (sl::POSITIONAL_TRACKING_MODE)tracking_params->mode;
+		params.enable_light_computation_mode = tracking_params->enable_light_computation_mode;
         if (area_file_path != nullptr) {
             if (std::string(area_file_path) != "") {
                 params.area_file_path = area_file_path;
@@ -720,7 +693,7 @@ sl::ERROR_CODE ZEDController::ingestDataIntoSVO(struct SL_SVOData* data)
         return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
-int ZEDController::getSVODataSize(char key[128], unsigned long long ts_begin, unsigned long long ts_end)
+int ZEDController::getSVODataSize(char* key, unsigned long long ts_begin, unsigned long long ts_end)
 {
     if (!isNull()) {
         std::map<sl::Timestamp, sl::SVOData> sdk_data;
@@ -735,26 +708,30 @@ int ZEDController::getSVODataSize(char key[128], unsigned long long ts_begin, un
     }
     return -1;
 }
-sl::ERROR_CODE ZEDController::retrieveSVOData(char key[128], int nb_data, struct SL_SVOData* data, unsigned long long ts_begin, unsigned long long ts_end)
+sl::ERROR_CODE ZEDController::retrieveSVOData(char* key, int nb_data, struct SL_SVOData** data, unsigned long long ts_begin, unsigned long long ts_end)
 {
     if (!isNull()) {
         if (isSVODataReady)
         {
             int idx = 0;
+            *data = (SL_SVOData*)malloc(sizeof(SL_SVOData) * nb_data);
             for (auto const& sdk_svo_data : currentSVOData)
             {
                 if (idx < nb_data)
-                {
-                    SL_SVOData svo_data;
-                    memset(&svo_data, 0, sizeof(SL_SVOData));
-                    svo_data.timestamp_ns = sdk_svo_data.second.timestamp_ns;
+                {          
+                    SL_SVOData* svo_data = new SL_SVOData();
+                    memset(svo_data, 0, sizeof(SL_SVOData));
+                    svo_data->timestamp_ns = sdk_svo_data.second.timestamp_ns;
                     std::string content;
                     sdk_svo_data.second.getContent(content);
-                    svo_data.content_size = content.size();
-                    svo_data.content = (char*)malloc(svo_data.content_size);
-                    strcpy(svo_data.content, content.c_str());
-                    if (sdk_svo_data.second.key.size() < 128)
-                        strcpy(&svo_data.key[0], sdk_svo_data.second.key.c_str());
+                    svo_data->content_size = content.size();
+					svo_data->key_size = sdk_svo_data.second.key.size();
+                    svo_data->content = (char*)malloc(content.size() + 1);
+                    svo_data->key = (char*)malloc(sdk_svo_data.second.key.size() + 1); // Allocate memory
+                    strncpy(svo_data->content, content.c_str(), content.size());
+                    svo_data->content[content.size()] = '\0';
+                    strncpy(svo_data->key, sdk_svo_data.second.key.c_str(), sdk_svo_data.second.key.size());
+                    svo_data->key[sdk_svo_data.second.key.size()] = '\0';
 
                     data[idx] = svo_data;
                     idx++;
@@ -779,17 +756,15 @@ int ZEDController::getSVODataKeysSize()
         return -1;
 }
 
-void ZEDController::getSVODataKeys(int nb_keys, char* keys[128])
+void ZEDController::getSVODataKeys(int nb_keys, char** keys)
 {
     if (!isNull()) {
         std::vector<std::string> sdk_svo_data_keys = zed.getSVODataKeys();
 
         for (int i = 0; i < nb_keys; i++)
         {
-            if (sdk_svo_data_keys[i].size() < 128)
-            {
-                strcpy(keys[i], sdk_svo_data_keys[i].c_str());
-            }
+            keys[i] = (char*)malloc(strlen(sdk_svo_data_keys[i].c_str()) + 1); // Allocate memory
+            strcpy(keys[i], sdk_svo_data_keys[i].c_str());
         }
     }
     else
@@ -1061,6 +1036,72 @@ sl::POSITIONAL_TRACKING_STATE ZEDController::getPoseArray(float* pose, int mat_t
         return sl::POSITIONAL_TRACKING_STATE::OFF;
 }
 
+int ZEDController::getPositionalTrackingLandmarks(SL_Landmark** landmarks, uint32_t* count)
+{
+    if (!isNull()) 
+    {
+        std::map<uint64_t, sl::Landmark> sdk_landmarks;
+		sl::ERROR_CODE err = zed.getPositionalTrackingLandmarks(sdk_landmarks);
+
+		if (err == sl::ERROR_CODE::SUCCESS)
+		{		
+            *count = static_cast<uint32_t>(sdk_landmarks.size());
+            *landmarks = (struct SL_Landmark*)std::malloc(sizeof(struct SL_Landmark) * sdk_landmarks.size());
+			if (!*landmarks)
+            {
+				std::cout << " sl_get_positional_tracking_landmarks : Error allocating memory" << std::endl;
+				return 1;
+			}
+			int idx = 0;
+			for (auto const& sdk_landmark : sdk_landmarks)
+			{
+                (*landmarks)[idx].id = sdk_landmark.first;
+
+				sl::float3 position = sdk_landmark.second.position;
+                (*landmarks)[idx].position.x = position.x;
+                (*landmarks)[idx].position.y = position.y;
+                (*landmarks)[idx].position.z = position.z;
+				idx++;
+			}
+		}
+        return (int)err;
+    }
+    else
+		return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED; 
+}
+
+int ZEDController::getPositionalTrackingLandmarks2d(SL_Landmark2D** landmarks, uint32_t* count)
+{
+    if (!isNull())
+    {
+        std::vector<sl::Landmark2D> sdk_landmarks;
+        sl::ERROR_CODE err = zed.getPositionalTrackingLandmarks2D(sdk_landmarks);
+        if (err == sl::ERROR_CODE::SUCCESS)
+        {
+            *count = sdk_landmarks.size();
+            *landmarks = (struct SL_Landmark2D*)malloc(sizeof(SL_Landmark2D) * sdk_landmarks.size());
+            if (!*landmarks)
+            {
+                std::cout << " sl_get_positional_tracking_landmarks2d : Error allocating memory" << std::endl;
+                return 1;
+            }
+            int idx = 0;
+            for (auto const& sdk_landmark : sdk_landmarks)
+            {
+                (*landmarks)[idx].id = sdk_landmark.id;
+                sl::uint2 position = sdk_landmark.image_position;
+                (*landmarks)[idx].image_position.x = position.x;
+                (*landmarks)[idx].image_position.y = position.y;
+
+                idx++;
+            }
+        }
+        return (int)err;
+    }
+    else
+        return (int)sl::ERROR_CODE::CAMERA_NOT_INITIALIZED;
+}
+
 struct SL_PositionalTrackingStatus* ZEDController::getPositionalTrackingStatus()
 {
     if (!isNull()) {
@@ -1273,6 +1314,9 @@ sl::ERROR_CODE ZEDController::enableSpatialMapping(struct SL_SpatialMappingParam
         params.use_chunk_only = mapping_param.use_chunk_only;
 		params.reverse_vertex_order = mapping_param.reverse_vertex_order;
         params.stability_counter = mapping_param.stability_counter;
+		params.disparity_std = mapping_param.disparity_std;
+		params.enable_forget_past = mapping_param.enable_forget_past;
+		params.decay = mapping_param.decay;
 
         if (mapping_param.map_type == SL_SPATIAL_MAP_TYPE_MESH) {
             params.save_texture = mapping_param.save_texture;
@@ -1538,8 +1582,12 @@ SL_SpatialMappingParameters* ZEDController::getSpatialMappingParameters() {
 	c_mappingParams->reverse_vertex_order = mappingParams.reverse_vertex_order;
 	c_mappingParams->save_texture = mappingParams.save_texture;
 	c_mappingParams->use_chunk_only = mappingParams.use_chunk_only;
+	c_mappingParams->stability_counter = mappingParams.stability_counter;
+	c_mappingParams->disparity_std = mappingParams.disparity_std;
+	c_mappingParams->enable_forget_past = mappingParams.enable_forget_past;
+	c_mappingParams->decay = mappingParams.decay;
 
-	return c_mappingParams;
+    return c_mappingParams;
 }
 
 void ZEDController::mergeChunks(int numberFaces, int* numVertices, int* numTriangles, int* numUpdatedSubmeshes, int* updatedIndices, int* numVerticesTot, int* numTrianglesTot, const int maxSubmesh) {
@@ -2012,6 +2060,14 @@ sl::ERROR_CODE ZEDController::ingestCustomBoxObjectData(int nb_objects, SL_Custo
 			tmp.is_static = obj.is_static;
 			tmp.tracking_timeout = obj.tracking_timeout;
 			tmp.tracking_max_dist = obj.tracking_max_dist;
+			tmp.max_box_width_meters = obj.max_box_width_meters;
+			tmp.min_box_width_meters = obj.min_box_width_meters;
+			tmp.max_box_height_meters = obj.max_box_height_meters;
+			tmp.min_box_height_meters = obj.min_box_height_meters;
+			if ((obj.max_allowed_acceleration == NAN) || (obj.max_allowed_acceleration == nan("")))
+				tmp.max_allowed_acceleration = makeQuietNaN();
+			else
+				tmp.max_allowed_acceleration = obj.max_allowed_acceleration;
 			for (int l = 0; l < 4; l++) {
 				sl::uint2 value;
 				value.x = obj.bounding_box_2d[l].x;
@@ -2045,6 +2101,14 @@ sl::ERROR_CODE ZEDController::ingestCustomMaskObjectData(int nb_objects, SL_Cust
 			tmp.is_static = obj.is_static;
 			tmp.tracking_timeout = obj.tracking_timeout;
 			tmp.tracking_max_dist = obj.tracking_max_dist;
+			tmp.max_box_width_meters = obj.max_box_width_meters;
+			tmp.min_box_width_meters = obj.min_box_width_meters;
+			tmp.max_box_height_meters = obj.max_box_height_meters;
+			tmp.min_box_height_meters = obj.min_box_height_meters;
+			if ((obj.max_allowed_acceleration == NAN) || (obj.max_allowed_acceleration == nan("")))
+				tmp.max_allowed_acceleration = makeQuietNaN();
+			else
+				tmp.max_allowed_acceleration = obj.max_allowed_acceleration;
 			for (int l = 0; l < 4; l++) {
 				sl::uint2 value;
 				value.x = obj.bounding_box_2d[l].x;
@@ -2179,6 +2243,16 @@ static void convert(const SL_CustomObjectDetectionProperties& in_data, sl::Custo
     out_data.min_box_width_normalized = in_data.min_box_width_normalized;
     out_data.max_box_height_normalized = in_data.max_box_height_normalized;
     out_data.min_box_height_normalized = in_data.min_box_height_normalized;
+    out_data.max_box_width_meters = in_data.max_box_width_meters;
+    out_data.min_box_width_meters = in_data.min_box_width_meters;
+    out_data.max_box_height_meters = in_data.max_box_height_meters;
+    out_data.min_box_height_meters = in_data.min_box_height_meters;
+    out_data.native_mapped_class = (sl::OBJECT_SUBCLASS)in_data.native_mapped_class;
+    out_data.object_acceleration_preset = (sl::OBJECT_ACCELERATION_PRESET)in_data.object_acceleration_preset;
+    if ((in_data.max_allowed_acceleration == NAN) || (in_data.max_allowed_acceleration == nan("")))
+        out_data.max_allowed_acceleration = makeQuietNaN();
+    else
+        out_data.max_allowed_acceleration = in_data.max_allowed_acceleration;
 }
 
 sl::ERROR_CODE ZEDController::retrieveCustomObjectDetectionData(SL_CustomObjectDetectionRuntimeParameters* _objruntimeparams,
@@ -2195,7 +2269,7 @@ sl::ERROR_CODE ZEDController::retrieveCustomObjectDetectionData(SL_CustomObjectD
         for (unsigned int i = 0; i < _objruntimeparams->number_custom_detection_properties; ++i) {
             convert(_objruntimeparams->object_class_detection_properties[i],
                     runtime_params.object_class_detection_properties[_objruntimeparams->object_class_detection_properties[i].class_id]);
-        }        sl::ERROR_CODE v = zed.retrieveObjects(objects, runtime_params, instance_id);
+        }        sl::ERROR_CODE v = zed.retrieveCustomObjects(objects, runtime_params, instance_id);
         if (v == sl::ERROR_CODE::SUCCESS) {
             convertObjects(objects, current_object_detection_model, data);
         }

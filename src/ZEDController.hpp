@@ -17,6 +17,33 @@ enum TRACKING_TYPE {
 
 static std::mutex globalmutex;
 
+inline struct SL_Resolution* convertResolution(const sl::Resolution& res)
+{
+	struct SL_Resolution* res_ = new SL_Resolution();
+	res_->width = res.width;
+	res_->height = res.height;
+	return res_;
+}
+
+inline struct SL_Vector3* convertVector3(const sl::float3& vector)
+{
+	struct SL_Vector3* vector_ = new SL_Vector3();
+	vector_->x = vector.x;
+	vector_->y = vector.y;
+	vector_->z = vector.z;
+	return vector_;
+}
+
+inline struct SL_Quaternion* convertQuaternion(const sl::float4& vector)
+{
+	struct SL_Quaternion* quat_ = new SL_Quaternion();
+    quat_->x = vector.x;
+    quat_->y = vector.y;
+    quat_->z = vector.z;
+    quat_->w = vector.w;
+	return quat_;
+}
+
 class ZEDController {
 public:
     ZEDController(int i);
@@ -54,6 +81,9 @@ public:
 
     sl::POSITIONAL_TRACKING_STATE getPoseArray(float* pose, int mat_type);
 
+	int getPositionalTrackingLandmarks(SL_Landmark** landmarks, uint32_t* count);
+    int getPositionalTrackingLandmarks2d(SL_Landmark2D** landmarks, uint32_t* count);
+
     struct SL_PositionalTrackingStatus* getPositionalTrackingStatus();
 
     inline unsigned int getWidth() {
@@ -73,7 +103,9 @@ public:
     SL_RuntimeParameters* getRuntimeParameters();
     SL_PositionalTrackingParameters* getPositionalTrackingParameters();
     sl::ERROR_CODE grab(SL_RuntimeParameters *runtimeParameters);
-
+	SL_HealthStatus* getHealthStatus();
+    SL_Resolution* getRetrieveImageResolution(SL_Resolution* res);
+    SL_Resolution* getRetrieveMeasureResolution(SL_Resolution* res);
 
     /************Recording******************/
     sl::ERROR_CODE enableRecording(const char* path, sl::SVO_COMPRESSION_MODE compressionMode, unsigned int bitrate, int targetFPS, bool transcode);
@@ -82,14 +114,13 @@ public:
 	SL_RecordingParameters* getRecordingParameters();
 
     sl::ERROR_CODE ingestDataIntoSVO(struct SL_SVOData* data);
-    int getSVODataSize(char key[128], unsigned long long ts_begin, unsigned long long ts_end);
-    sl::ERROR_CODE retrieveSVOData(char key[128], int nb_data, struct SL_SVOData* data, unsigned long long ts_begin, unsigned long long ts_end);
+    int getSVODataSize(char* key, unsigned long long ts_begin, unsigned long long ts_end);
+    sl::ERROR_CODE retrieveSVOData(char* key, int nb_data, struct SL_SVOData** data, unsigned long long ts_begin, unsigned long long ts_end);
     int getSVODataKeysSize();
-    void getSVODataKeys(int nb_keys, char* keys[128]);
+    void getSVODataKeys(int nb_keys, char** keys);
 
     /************Tracking*******************/
-    sl::ERROR_CODE enableTracking(const SL_Quaternion *initial_world_rotation, const SL_Vector3 *initial_world_position, bool enable_area_memory, bool enable_pose_smoothing, bool set_floor_as_origin, bool set_as_static,
-        bool enable_imu_fusion, float depth_min_range, bool set_gravity_as_origin, SL_POSITIONAL_TRACKING_MODE mode, const char* area_file_path);
+    sl::ERROR_CODE enableTracking(SL_PositionalTrackingParameters* tracking_params, const char* area_file_path);
     sl::POSITIONAL_TRACKING_STATE getPosition(SL_Quaternion *quat, SL_Vector3 *vec, sl::REFERENCE_FRAME mat_type);
     sl::POSITIONAL_TRACKING_STATE getPosition(SL_Quaternion *quat, SL_Vector3 *vec, SL_Vector3 *offset, SL_Quaternion *offsetRotation, int type);
     sl::POSITIONAL_TRACKING_STATE getPosition(SL_PoseData *pose, int reference_frame);
@@ -214,7 +245,7 @@ private:
 
 #if WITH_OBJECT_DETECTION
     template <typename SL_ObjectDetectionRuntimeParameters_t>
-    sl::ERROR_CODE retrieveObjects(SL_ObjectDetectionRuntimeParameters_t* runtimeParams, SL_Objects* data, unsigned int instance_id);
+    sl::ERROR_CODE retrieveObjectsGeneric(SL_ObjectDetectionRuntimeParameters_t* runtimeParams, SL_Objects* data, unsigned int instance_id);
 #endif
 
     int open();
