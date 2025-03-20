@@ -129,8 +129,8 @@ public:
 
     ///
     /// \brief retrieves a list of bodies (in SL_Bodies class type) seen by all cameras and merged as if it was seen by a single super-camera.
-    /// \note Internal calls retrieveObjects() for all listed cameras, then merged into a single SL_Bodies
-    /// \param [out] bodies: list of objects seen by all available cameras
+    /// \note Internal calls retrieveBodies() for all listed cameras, then merged into a single SL_Bodies
+    /// \param [out] bodies: list of bodies seen by all available cameras
     /// \note Only the 3d informations is available in the returned object.
     ///
     enum SL_FUSION_ERROR_CODE retrieveBodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid);

@@ -32,6 +32,8 @@ SL_FUSION_ERROR_CODE ZEDFusionController::init(struct SL_InitFusionParameters* i
 	init_params.synchronization_parameters.data_source_timeout = init_parameters->synchronization_parameters.data_source_timeout;
 	init_params.synchronization_parameters.keep_last_data = init_parameters->synchronization_parameters.keep_last_data;
 	init_params.synchronization_parameters.maximum_lateness = init_parameters->synchronization_parameters.maximum_lateness;
+	init_params.sdk_gpu_id = init_parameters->sdk_gpu_id;
+	init_params.sdk_cuda_ctx = init_parameters->sdk_cuda_ctx;
 
 	sl::FUSION_ERROR_CODE err = fusion.init(init_params);
 
