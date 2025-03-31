@@ -274,7 +274,6 @@ SL_PositionalTrackingParameters* ZEDController::getPositionalTrackingParameters(
     c_trackingParams->depth_min_range = trackingParams.depth_min_range;
     c_trackingParams->set_gravity_as_origin = trackingParams.set_gravity_as_origin;
     c_trackingParams->mode = (SL_POSITIONAL_TRACKING_MODE)trackingParams.mode;
-	c_trackingParams->enable_light_computation_mode = trackingParams.enable_light_computation_mode;
     return c_trackingParams;
 }
 
@@ -353,7 +352,6 @@ sl::ERROR_CODE ZEDController::enableTracking(SL_PositionalTrackingParameters* tr
         params.depth_min_range = tracking_params->depth_min_range;
         params.set_gravity_as_origin = tracking_params->set_gravity_as_origin;
         params.mode = (sl::POSITIONAL_TRACKING_MODE)tracking_params->mode;
-		params.enable_light_computation_mode = tracking_params->enable_light_computation_mode;
         if (area_file_path != nullptr) {
             if (std::string(area_file_path) != "") {
                 params.area_file_path = area_file_path;
@@ -2039,7 +2037,7 @@ void ZEDController::disableObjectDetection(unsigned int instance_id, bool force_
 void ZEDController::disableBodyTracking(unsigned int instance_id, bool force_disable_all_instances) {
     if (!isNull()) {
         sdk_mutex.lock();
-        zed.disableObjectDetection(instance_id, force_disable_all_instances);
+        zed.disableBodyTracking(instance_id, force_disable_all_instances);
         sdk_mutex.unlock();
     }
 }

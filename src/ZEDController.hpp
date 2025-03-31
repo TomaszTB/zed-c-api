@@ -57,7 +57,7 @@ public:
     }
 
     static void destroyInstance(int i) {
-        if (instance[i])
+        if (!instance[i]) // Only allow one instance of class to be generated.
             delete instance[i];
         instance[i] = nullptr;
 
@@ -168,10 +168,6 @@ public:
 
     void lock() {
         sdk_mutex.lock();
-    }
-
-    bool try_lock() {
-        return sdk_mutex.try_lock();
     }
 
     void unlock() {

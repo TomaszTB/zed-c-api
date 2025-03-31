@@ -42,13 +42,6 @@ extern "C" {
     INTERFACE_API void sl_unload_instance(int camera_id);
 
     /**
-    \brief Checks usb devices connected.
-    *param device : type of device to find.
-    \return true if connected.
-    */
-    INTERFACE_API bool sl_find_usb_device(enum USB_DEVICE device);
-
-    /**
     * \brief Creates a camera with resolution mode, fps and id for linux.
     * \param camera_id : id of the camera to be added.
     * \param verbose : Enable verbose mode.

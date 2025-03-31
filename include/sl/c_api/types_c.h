@@ -432,17 +432,6 @@ struct SL_SensorsData {
 	int image_sync_trigger;
 };
 
-enum USB_DEVICE {
-	USB_DEVICE_OCULUS,
-	USB_DEVICE_HTC,
-	USB_DEVICE_STEREOLABS
-};
-
-struct USB_product {
-	int id_vendor;
-	int id_product;
-};
-
 /**
 \brief Lists error codes in the ZED SDK.
  */
@@ -1443,7 +1432,7 @@ struct SL_InitParameters
 	\n In the range [0-100]: <ul>
 	<li>0 disable the depth stabilization (raw depth will be return)</li>
 	<li>stabilization smoothness is linear from 1 to 100</li></ul>
-	Default: 1
+	Default: 30
 	
 	\note The stabilization uses the positional tracking to increase its accuracy, 
 	so the positional tracking module will be enabled automatically when set to a value different from 0.
@@ -1578,7 +1567,7 @@ struct SL_InitParameters
 	 This version doesn't detect frame tearing currently.
 	 \n default: disabled
 	 */
-	int enable_image_validity_check;
+	bool enable_image_validity_check;
 
 	/**
 	\brief Set a maximum size for all SDK output, like retrieveImage and retrieveMeasure functions.
@@ -2034,12 +2023,6 @@ struct SL_PositionalTrackingParameters
 	\n Default: \ref SL_POSITIONAL_TRACKING_MODE_GEN_1
 	*/
 	enum SL_POSITIONAL_TRACKING_MODE mode;
-	/**
-	\brief Should enable light computation mode	
-	If enabled the tracking will just run the part needed by Fusion and nothing more. This parameter will degrade accuracy if
-	positional tracking module is used alone without Fusion. This parameter works only with GEN_2 module.
-	*/
-	bool enable_light_computation_mode;
 };
 
 /**
