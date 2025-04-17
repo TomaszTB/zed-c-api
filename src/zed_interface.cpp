@@ -104,17 +104,14 @@ extern "C" {
 
     INTERFACE_API int sl_open_camera(int id, SL_InitParameters* init_parameters, const unsigned int serial_number, const char* path_svo, const char* ip, int stream_port, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path) {
         int err = (int)sl::ERROR_CODE::CAMERA_NOT_DETECTED;
-        if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::USB) {
-            err = ZEDController::get(id)->initFromUSB(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
-        }
-        else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::SVO) {
+        if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::SVO) {
             err = ZEDController::get(id)->initFromSVO(init_parameters, path_svo, output_file, opt_settings_path, opencv_calib_path);
         }
         else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::STREAM) {
             err = ZEDController::get(id)->initFromStream(init_parameters, ip, stream_port, output_file, opt_settings_path, opencv_calib_path);
         }
-        else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::GMSL) {
-            err = ZEDController::get(id)->initFromGMSL(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
+        else {
+            err = ZEDController::get(id)->initFromLive(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
         }
         return err;
     }

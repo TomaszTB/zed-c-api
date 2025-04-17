@@ -168,6 +168,27 @@ int ZEDController::initFromGMSL(SL_InitParameters* params, const unsigned int se
 
 }
 
+int ZEDController::initFromLive(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path) {
+
+    char buffer_verbose[2048];
+    if (cameraOpened) {
+        sprintf(buffer_verbose, "[initFromGMSL] Camera already opened %d = %d return success", params->camera_device_id, camera_ID);
+        return 0;
+    }
+    sprintf(buffer_verbose, "ENTER ZEDController::initFromGMSL %d = %d", params->camera_device_id, camera_ID);
+    initParams.camera_resolution = (sl::RESOLUTION)params->resolution;
+    if (serial_number > 0) {
+        initParams.input.setFromSerialNumber(serial_number, sl::BUS_TYPE::AUTO);
+    }
+    else {
+        initParams.input.setFromCameraID(params->camera_device_id, sl::BUS_TYPE::AUTO);
+    }
+    copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
+
+    return open();
+
+}
+
 int ZEDController::open() {
 
     globalmutex.lock();
