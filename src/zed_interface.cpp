@@ -104,16 +104,18 @@ extern "C" {
 
     INTERFACE_API int sl_open_camera(int id, SL_InitParameters* init_parameters, const unsigned int serial_number, const char* path_svo, const char* ip, int stream_port, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path) {
         int err = (int)sl::ERROR_CODE::CAMERA_NOT_DETECTED;
-        if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::SVO) {
+        if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::USB) {
+            err = ZEDController::get(id)->initFromUSB(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
+        }
+        else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::SVO) {
             err = ZEDController::get(id)->initFromSVO(init_parameters, path_svo, output_file, opt_settings_path, opencv_calib_path);
         }
         else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::STREAM) {
             err = ZEDController::get(id)->initFromStream(init_parameters, ip, stream_port, output_file, opt_settings_path, opencv_calib_path);
         }
-        else {
-            err = ZEDController::get(id)->initFromLive(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
+        else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::GMSL) {
+            err = ZEDController::get(id)->initFromGMSL(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
         }
-
         return err;
     }
 
@@ -1573,21 +1575,21 @@ extern "C" {
 	}
 
     /***************************MAT*************************/
-    INTERFACE_API int sl_retrieve_measure(int c_id, void* ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height, cudaStream_t custream) {
+    INTERFACE_API int sl_retrieve_measure(int c_id, void* ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height, int custream) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->zed.retrieveMeasure(*MAT, (sl::MEASURE)type, (sl::MEM)(mem + 1), sl::Resolution(width, height), custream);
+            return (int)ZEDController::get(c_id)->zed.retrieveMeasure(*MAT, (sl::MEASURE)type, (sl::MEM)(mem + 1), sl::Resolution(width, height), (cudaStream_t)custream);
         }
         return (int)sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
 
-    INTERFACE_API int sl_retrieve_image(int c_id, void* ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height, cudaStream_t custream) {
+    INTERFACE_API int sl_retrieve_image(int c_id, void* ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height, int custream) {
         if (!ZEDController::get(c_id)->isNull()) {
-            return (int)ZEDController::get(c_id)->zed.retrieveImage(*MAT, (sl::VIEW)type, (sl::MEM)(mem + 1), sl::Resolution(width, height), custream);
+            return (int)ZEDController::get(c_id)->zed.retrieveImage(*MAT, (sl::VIEW)type, (sl::MEM)(mem + 1), sl::Resolution(width, height), (cudaStream_t)custream);
         }
         return (int)sl::ERROR_CODE::CAMERA_NOT_DETECTED;
     }
 
-    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, cudaStream_t stream) {
+    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, int stream) {
         return (int)sl::convertImage(*(sl::Mat*)image_in_ptr, *(sl::Mat*)image_signed_ptr, (cudaStream_t)stream);
     }
 
@@ -1859,18 +1861,18 @@ extern "C" {
      * This methods works only on 8U_C4 if remove_alpha_channels is enabled, or 8U_C4 and 8U_C3 if swap_RB_channels is enabled
      * The inplace method sl::Mat::convertColor can be used for only swapping the Red and Blue channel efficiently
      */
-    INTERFACE_API int sl_mat_convert_color(void* ptr, enum SL_MEM memory, bool swap_RB_channels, cudaStream_t stream)
+    INTERFACE_API int sl_mat_convert_color(void* ptr, enum SL_MEM memory, bool swap_RB_channels, int stream)
     {
-		return (int)MAT->convertColor((sl::MEM)(memory + 1), stream, swap_RB_channels);
+		return (int)MAT->convertColor((sl::MEM)(memory + 1), (cudaStream_t)stream, swap_RB_channels);
     }
 
     /**
     \brief Convert the color channels of the Mat (RGB<->BGR or RGBA<->BGRA)
      * This methods works only on 8U_C4 or 8U_C3
      */
-    INTERFACE_API int sl_convert_color(void* mat1, void* mat2, bool swap_RB_channels, bool remove_alpha_channels, enum SL_MEM memory, cudaStream_t stream)
+    INTERFACE_API int sl_convert_color(void* mat1, void* mat2, bool swap_RB_channels, bool remove_alpha_channels, enum SL_MEM memory, int stream)
     {
-		return (int)sl::Mat::convertColor(*(sl::Mat*)mat1, *(sl::Mat*)mat2, swap_RB_channels, remove_alpha_channels, (sl::MEM)(memory + 1), stream);
+		return (int)sl::Mat::convertColor(*(sl::Mat*)mat1, *(sl::Mat*)mat2, swap_RB_channels, remove_alpha_channels, (sl::MEM)(memory + 1), (cudaStream_t)stream);
     }
 
     /**
@@ -1887,12 +1889,12 @@ extern "C" {
      */
 	INTERFACE_API int sl_blob_from_image(void* ptr, void* tensor_out, struct SL_Resolution resolution_out, 
         float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels, 
-        cudaStream_t stream)
+        int stream)
 	{
 		return (int)sl::blobFromImage(*MAT, *(sl::Mat*)tensor_out, sl::Resolution(resolution_out.width, resolution_out.height), 
             scalefactor, sl::float3(mean.x, mean.y, mean.z), 
             sl::float3(stddev.x, stddev.y, stddev.z), 
-            keep_aspect_ratio, swap_RB_channels, stream);
+            keep_aspect_ratio, swap_RB_channels, (cudaStream_t)stream);
     }
 
     /**
@@ -1909,7 +1911,7 @@ extern "C" {
      */
     INTERFACE_API int sl_blob_from_images(void** array_ptr, int nb_images, void* tensor_out, struct SL_Resolution resolution_out,
         float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels,
-        cudaStream_t stream)
+        int stream)
     {
         std::vector<sl::Mat> array(nb_images);
 		for (int i = 0; i < nb_images; i++) {
@@ -1918,7 +1920,7 @@ extern "C" {
 		int res = (int)sl::blobFromImages(array, *(sl::Mat*)tensor_out, sl::Resolution(resolution_out.width, resolution_out.height),
 			scalefactor, sl::float3(mean.x, mean.y, mean.z),
 			sl::float3(stddev.x, stddev.y, stddev.z),
-			keep_aspect_ratio, swap_RB_channels, stream);
+			keep_aspect_ratio, swap_RB_channels, (cudaStream_t)stream);
 
 		return res;
     }
