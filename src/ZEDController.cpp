@@ -189,7 +189,6 @@ int ZEDController::initFromLive(SL_InitParameters* params, const unsigned int se
 
 }
 
-
 int ZEDController::open() {
 
     globalmutex.lock();

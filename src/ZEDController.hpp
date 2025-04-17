@@ -79,7 +79,7 @@ public:
     int initFromStream(SL_InitParameters *params, const char* ip, int port, const char* outputFile, const char* opt_settings_path, const char* opencv_calib_path);
     int initFromGMSL(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
     int initFromLive(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
-
+    
     sl::POSITIONAL_TRACKING_STATE getPoseArray(float* pose, int mat_type);
 
 	int getPositionalTrackingLandmarks(SL_Landmark** landmarks, uint32_t* count);

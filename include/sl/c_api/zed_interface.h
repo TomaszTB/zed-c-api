@@ -1154,7 +1154,7 @@ extern "C" {
     \return \ref SL_ERROR_CODE "SL_ERROR_CODE_INVALID_RESOLUTION" if the resolution is higher than one provided by getCameraInformation().camera_configuration.resolution.
     \return \ref SL_ERROR_CODE "SL_ERROR_CODE_FAILURE" if another error occurred.
      */
-    INTERFACE_API int sl_retrieve_measure(int camera_id, void* measure_ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height, cudaStream_t custream);
+    INTERFACE_API int sl_retrieve_measure(int camera_id, void* measure_ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height, int custream);
     /**
     \brief Retrieves an image texture from the ZED SDK in a human-viewable format.
     
@@ -1168,7 +1168,7 @@ extern "C" {
     \param height : Height of the texture in pixel.
     \return \ref SL_ERROR_CODE "SL_ERROR_CODE_SUCCESS" if the retrieve succeeded.
      */
-    INTERFACE_API int sl_retrieve_image(int camera_id, void* image_ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height, cudaStream_t custream);
+    INTERFACE_API int sl_retrieve_image(int camera_id, void* image_ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height, int custream);
 
     /**
     \brief Convert Image format from Unsigned char to Signed char, designed for Unreal Engine pipeline, works on GPU memory.
@@ -1177,7 +1177,7 @@ extern "C" {
     \param stream : a cuda stream to put the compute to (def. 0)
     \note If the Output Mat does not satisfies the requirements, it is freed and re-allocated.
     */
-    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, cudaStream_t stream);
+    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, int stream);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////// Streaming Sender //////////////////////////////////////////////////////////////////////
@@ -2137,14 +2137,14 @@ extern "C" {
     \brief Convert the color channels of the Mat (RGB<->BGR or RGBA<->BGRA)
      * This methods works only on 8U_C4 or 8U_C3
      */
-    INTERFACE_API int sl_mat_convert_color(void* ptr, enum SL_MEM memory, bool swap_RB_channels, cudaStream_t stream);
+    INTERFACE_API int sl_mat_convert_color(void* ptr, enum SL_MEM memory, bool swap_RB_channels, int stream);
 
     /**
     \brief Convert the color channels of the Mat into another Mat
      * This methods works only on 8U_C4 if remove_alpha_channels is enabled, or 8U_C4 and 8U_C3 if swap_RB_channels is enabled
      * The inplace method sl::Mat::convertColor can be used for only swapping the Red and Blue channel efficiently
      */
-    INTERFACE_API int sl_convert_color(void* mat1, void* mat2, bool swap_RB_channels, bool remove_alpha_channels, enum SL_MEM memory, cudaStream_t stream);
+    INTERFACE_API int sl_convert_color(void* mat1, void* mat2, bool swap_RB_channels, bool remove_alpha_channels, enum SL_MEM memory, int stream);
 
     /**
     \brief Convert an image into a GPU Tensor in planar channel configuration (NCHW), ready to use for deep learning model
@@ -2160,7 +2160,7 @@ extern "C" {
      */
     INTERFACE_API int sl_blob_from_image(void* image_in, void* tensor_out, struct SL_Resolution resolution_out,
         float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels,
-        cudaStream_t stream);
+        int stream);
 
     /**
     \brief Convert a list of images into a GPU Tensor in planar channel configuration (NCHW), ready to use for deep learning model
@@ -2178,7 +2178,7 @@ extern "C" {
 
 	INTERFACE_API int sl_blob_from_images(void** image_in, int nb_images, void* tensor_out, struct SL_Resolution resolution_out,
 		float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels,
-		cudaStream_t stream);
+		int stream);
 
 #ifdef __cplusplus
 }
