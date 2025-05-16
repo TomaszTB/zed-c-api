@@ -34,7 +34,7 @@ SL_FUSION_ERROR_CODE ZEDFusionController::init(struct SL_InitFusionParameters* i
 	init_params.synchronization_parameters.maximum_lateness = init_parameters->synchronization_parameters.maximum_lateness;
 	init_params.sdk_gpu_id = init_parameters->sdk_gpu_id;
 	init_params.sdk_cuda_ctx = init_parameters->sdk_cuda_ctx;
-
+	init_params.maximum_working_resolution = sl::Resolution(init_parameters->maximum_working_resolution.width, init_parameters->maximum_working_resolution.height);
 	sl::FUSION_ERROR_CODE err = fusion.init(init_params);
 
 	return (SL_FUSION_ERROR_CODE)err;
@@ -92,6 +92,25 @@ SL_FUSION_ERROR_CODE ZEDFusionController::updatePose(struct SL_CameraIdentifier*
 	return (SL_FUSION_ERROR_CODE)fusion.updatePose(sl_uuid, pose);
 }
 
+SL_FUSION_ERROR_CODE ZEDFusionController::getPose(SL_CameraIdentifier* uuid, SL_Vector3* pose_translation, SL_Quaternion* pose_rotation)
+{
+	sl::FUSION_ERROR_CODE err = sl::FUSION_ERROR_CODE::FAILURE;
+	sl::Transform pose;
+	err = fusion.getPose(sl::CameraIdentifier(uuid->sn), pose);
+
+	if (err == sl::FUSION_ERROR_CODE::SUCCESS)
+	{
+		pose_translation->x = pose.getTranslation().x;
+		pose_translation->y = pose.getTranslation().y;
+		pose_translation->z = pose.getTranslation().z;
+		pose_rotation->x = pose.getOrientation().x;
+		pose_rotation->y = pose.getOrientation().y;
+		pose_rotation->z = pose.getOrientation().z;
+		pose_rotation->w = pose.getOrientation().w;
+	}
+	return (SL_FUSION_ERROR_CODE)err;
+}
+
 SL_FUSION_ERROR_CODE ZEDFusionController::enableBodyTracking(struct SL_BodyTrackingFusionParameters* params)
 {
 	BT_fusion_init_params.enable_tracking = params->enable_tracking;
@@ -104,7 +123,7 @@ void ZEDFusionController::disableBodyTracking() {
 	fusion.disableBodyTracking();
 }
 
-SL_FUSION_ERROR_CODE ZEDFusionController::retrieveBodies(struct SL_Bodies* data, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid) {
+SL_FUSION_ERROR_CODE ZEDFusionController::retrieveBodies(struct SL_Bodies* data, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid, enum SL_FUSION_REFERENCE_FRAME reference_frame) {
 	memset(data, 0, sizeof(SL_Bodies));
 
 	sl::BodyTrackingFusionRuntimeParameters bt_rt;
@@ -116,7 +135,7 @@ SL_FUSION_ERROR_CODE ZEDFusionController::retrieveBodies(struct SL_Bodies* data,
 	sdk_uuid.sn = uuid.sn;
 
 	sl::Bodies bodies;
-	sl::FUSION_ERROR_CODE v = fusion.retrieveBodies(bodies, bt_rt, sdk_uuid);
+	sl::FUSION_ERROR_CODE v = fusion.retrieveBodies(bodies, bt_rt, sdk_uuid, (sl::FUSION_REFERENCE_FRAME)reference_frame);
 	if (v == sl::FUSION_ERROR_CODE::SUCCESS) {
 		data->is_new = (int)bodies.is_new;
 
@@ -437,6 +456,7 @@ SL_FUSION_ERROR_CODE ZEDFusionController::enablePositionalTracking(struct SL_Pos
 	sl::PositionalTrackingFusionParameters sdk_params;
 	sdk_params.enable_GNSS_fusion = params->enable_GNSS_fusion;
 	sdk_params.set_gravity_as_origin = params->set_gravity_as_origin;
+	sdk_params.tracking_camera_id = sl::CameraIdentifier(params->tracking_camera_id.sn);
 
 	sl::float3 translation(params->base_footprint_to_world_translation.x, params->base_footprint_to_world_translation.y, params->base_footprint_to_world_translation.z);
 	sl::float4 orientation(params->base_footprint_to_world_rotation.x, params->base_footprint_to_world_rotation.y, params->base_footprint_to_world_rotation.z, params->base_footprint_to_world_rotation.w);
@@ -674,6 +694,60 @@ enum SL_GNSS_FUSION_STATUS ZEDFusionController::cameraToGeo(struct SL_PoseData* 
 	}
 
 	return state;
+}
+
+SL_FUSION_ERROR_CODE ZEDFusionController::enuToGeo(struct SL_ENU* in, struct SL_LatLng* out)
+{
+	sl::FUSION_ERROR_CODE err = sl::FUSION_ERROR_CODE::FAILURE;
+
+	sl::ENU enu;
+	enu.east = in->east;
+	enu.north = in->north;
+	enu.up = in->up;
+
+	sl::LatLng latLng;
+	err = fusion.ENU2Geo(enu, latLng);
+
+	if (err == sl::FUSION_ERROR_CODE::SUCCESS)
+	{
+		out->latitude = latLng.getLatitude();
+		out->longitude = latLng.getLongitude();
+		out->altitude = latLng.getAltitude();
+	}
+	else
+	{
+		out->latitude = 0;
+		out->longitude = 0;
+		out->altitude = 0;
+	}
+
+	return (SL_FUSION_ERROR_CODE)err;
+}
+
+SL_FUSION_ERROR_CODE ZEDFusionController::geoToEnu(struct SL_LatLng* in, struct SL_ENU* out)
+{
+	sl::FUSION_ERROR_CODE err = sl::FUSION_ERROR_CODE::FAILURE;
+
+	sl::LatLng latLng;
+	latLng.setCoordinates(in->latitude, in->longitude, in->altitude);
+
+	sl::ENU enu;
+	err = fusion.Geo2ENU(latLng, enu);
+
+	if (err == sl::FUSION_ERROR_CODE::SUCCESS)
+	{
+		out->east = enu.east;
+		out->north = enu.north;
+		out->up = enu.up;
+	}
+	else
+	{
+		out->east = 0;
+		out->north = 0;
+		out->up = 0;
+	}
+
+	return (SL_FUSION_ERROR_CODE)err;
 }
 
 enum SL_GNSS_FUSION_STATUS ZEDFusionController::getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std)
