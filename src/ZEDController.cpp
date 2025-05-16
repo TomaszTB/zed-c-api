@@ -168,27 +168,6 @@ int ZEDController::initFromGMSL(SL_InitParameters* params, const unsigned int se
 
 }
 
-int ZEDController::initFromLive(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path) {
-
-    char buffer_verbose[2048];
-    if (cameraOpened) {
-        sprintf(buffer_verbose, "[initFromGMSL] Camera already opened %d = %d return success", params->camera_device_id, camera_ID);
-        return 0;
-    }
-    sprintf(buffer_verbose, "ENTER ZEDController::initFromGMSL %d = %d", params->camera_device_id, camera_ID);
-    initParams.camera_resolution = (sl::RESOLUTION)params->resolution;
-    if (serial_number > 0) {
-        initParams.input.setFromSerialNumber(serial_number, sl::BUS_TYPE::AUTO);
-    }
-    else {
-        initParams.input.setFromCameraID(params->camera_device_id, sl::BUS_TYPE::AUTO);
-    }
-    copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
-
-    return open();
-
-}
-
 int ZEDController::open() {
 
     globalmutex.lock();
@@ -2251,6 +2230,21 @@ sl::ERROR_CODE ZEDController::retrieveObjectDetectionData(SL_ObjectDetectionRunt
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
+sl::ERROR_CODE ZEDController::retrieveObjectDetectionData(SL_Objects* data, unsigned int instance_id)
+{
+    if (!isNull()) {
+        sl::Objects objects;
+        cuCtxSetCurrent(zed.getCUDAContext());
+        sl::ERROR_CODE v = zed.retrieveObjects(objects, instance_id);
+
+        if (v == sl::ERROR_CODE::SUCCESS) {
+            convertObjects(objects, current_object_detection_model, data);
+        }
+        return v;
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
 static void convert(const SL_CustomObjectDetectionProperties& in_data, sl::CustomObjectDetectionProperties& out_data) {
     out_data.enabled = in_data.enabled;
     out_data.detection_confidence_threshold = in_data.detection_confidence_threshold;
@@ -2288,13 +2282,128 @@ sl::ERROR_CODE ZEDController::retrieveCustomObjectDetectionData(SL_CustomObjectD
         for (unsigned int i = 0; i < _objruntimeparams->number_custom_detection_properties; ++i) {
             convert(_objruntimeparams->object_class_detection_properties[i],
                     runtime_params.object_class_detection_properties[_objruntimeparams->object_class_detection_properties[i].class_id]);
-        }        sl::ERROR_CODE v = zed.retrieveCustomObjects(objects, runtime_params, instance_id);
+        }        
+        sl::ERROR_CODE v = zed.retrieveCustomObjects(objects, runtime_params, instance_id);
         if (v == sl::ERROR_CODE::SUCCESS) {
             convertObjects(objects, current_object_detection_model, data);
         }
         return v;
     }
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
+static void convertBodies(const sl::Bodies& bodies,
+    const sl::BODY_TRACKING_MODEL current_Body_tracking_model,
+    SL_Bodies* data)
+{
+
+    data->is_new = bodies.is_new;
+    data->is_tracked = bodies.is_tracked;
+    int size_objects = bodies.body_list.size();
+    data->timestamp = bodies.timestamp;
+    data->nb_bodies = size_objects;
+    data->body_format = (SL_BODY_FORMAT)bodies.body_format;
+    data->inference_precision_mode = (enum SL_INFERENCE_PRECISION)bodies.inference_precision_mode;
+
+    int count = 0;
+
+    for (auto& p : bodies.body_list)
+    {
+        if (count < MAX_NUMBER_OBJECT)
+        {
+            data->body_list[count].tracking_state = (SL_OBJECT_TRACKING_STATE)p.tracking_state;
+            data->body_list[count].action_state = (SL_OBJECT_ACTION_STATE)p.action_state;
+            data->body_list[count].id = p.id;
+            data->body_list[count].confidence = p.confidence;
+
+            memcpy(data->body_list[count].unique_object_id, p.unique_object_id.get(), 37 * sizeof(char));
+
+            for (int k = 0; k < 6; k++)
+                data->body_list[count].position_covariance[k] = p.position_covariance[k];
+
+            data->body_list[count].mask = (int*)(new sl::Mat(p.mask));
+
+            // 3D Bounding box in world frame
+            for (int m = 0; m < 8; m++)
+            {
+                if (m < p.bounding_box.size())
+                {
+                    data->body_list[count].bounding_box[m].x = p.bounding_box.at(m).x;
+                    data->body_list[count].bounding_box[m].y = p.bounding_box.at(m).y;
+                    data->body_list[count].bounding_box[m].z = p.bounding_box.at(m).z;
+                }
+            }
+
+            for (int l = 0; l < 4; l++)
+            {
+                data->body_list[count].bounding_box_2d[l].x = (float)p.bounding_box_2d.at(l).x;
+                data->body_list[count].bounding_box_2d[l].y = (float)p.bounding_box_2d.at(l).y;
+            }
+
+            for (int l = 0; l < p.head_bounding_box.size(); l++)
+            {
+                data->body_list[count].head_bounding_box[l].x = (float)p.head_bounding_box.at(l).x;
+                data->body_list[count].head_bounding_box[l].y = (float)p.head_bounding_box.at(l).y;
+            }
+
+            for (int l = 0; l < p.head_bounding_box_2d.size(); l++)
+            {
+                data->body_list[count].head_bounding_box_2d[l].x = (float)p.head_bounding_box_2d.at(l).x;
+                data->body_list[count].head_bounding_box_2d[l].y = (float)p.head_bounding_box_2d.at(l).y;
+            }
+
+            // World data
+            data->body_list[count].position.x = p.position.x;
+            data->body_list[count].position.y = p.position.y;
+            data->body_list[count].position.z = p.position.z;
+
+            data->body_list[count].velocity.x = p.velocity.x;
+            data->body_list[count].velocity.y = p.velocity.y;
+            data->body_list[count].velocity.z = p.velocity.z;
+
+            data->body_list[count].dimensions.x = p.dimensions.x;
+            data->body_list[count].dimensions.y = p.dimensions.y;
+            data->body_list[count].dimensions.z = p.dimensions.z;
+
+            data->body_list[count].head_position.x = p.head_position.x;
+            data->body_list[count].head_position.y = p.head_position.y;
+            data->body_list[count].head_position.z = p.head_position.z;
+
+            for (int i = 0; i < p.keypoint.size(); i++)
+            {
+                data->body_list[count].keypoint_2d[i].x = p.keypoint_2d.at(i).x;
+                data->body_list[count].keypoint_2d[i].y = p.keypoint_2d.at(i).y;
+
+                data->body_list[count].keypoint[i].x = p.keypoint.at(i).x;
+                data->body_list[count].keypoint[i].y = p.keypoint.at(i).y;
+                data->body_list[count].keypoint[i].z = p.keypoint.at(i).z;
+                data->body_list[count].keypoint_confidence[i] = p.keypoint_confidence.at(i);
+
+                for (int k = 0; k < 6; k++)
+                {
+                    data->body_list[count].keypoint_covariances[i][k] = p.keypoint_covariances[i][k];
+                }
+            }
+
+            data->body_list[count].global_root_orientation.x = p.global_root_orientation.x;
+            data->body_list[count].global_root_orientation.y = p.global_root_orientation.y;
+            data->body_list[count].global_root_orientation.z = p.global_root_orientation.z;
+            data->body_list[count].global_root_orientation.w = p.global_root_orientation.w;
+
+            for (int i = 0; i < p.local_orientation_per_joint.size(); i++) {
+
+                data->body_list[count].local_orientation_per_joint[i].x = p.local_orientation_per_joint[i].x;
+                data->body_list[count].local_orientation_per_joint[i].y = p.local_orientation_per_joint[i].y;
+                data->body_list[count].local_orientation_per_joint[i].z = p.local_orientation_per_joint[i].z;
+                data->body_list[count].local_orientation_per_joint[i].w = p.local_orientation_per_joint[i].w;
+
+                data->body_list[count].local_position_per_joint[i].x = p.local_position_per_joint[i].x;
+                data->body_list[count].local_position_per_joint[i].y = p.local_position_per_joint[i].y;
+                data->body_list[count].local_position_per_joint[i].z = p.local_position_per_joint[i].z;
+            }
+        }
+        count++;
+    }
 }
 
 sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_BodyTrackingRuntimeParameters* _bodyruntimeparams, SL_Bodies* data, unsigned int instance_id) 
@@ -2313,114 +2422,82 @@ sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_BodyTrackingRuntimePar
         sl::ERROR_CODE v = zed.retrieveBodies(bodies, runtime_params, instance_id);
         if (v == sl::ERROR_CODE::SUCCESS) 
         {
-            data->is_new = bodies.is_new;
-            data->is_tracked = bodies.is_tracked;
-            int size_objects = bodies.body_list.size();
-            data->timestamp = bodies.timestamp;
-            data->nb_bodies = size_objects;
-			data->body_format = (SL_BODY_FORMAT)bodies.body_format;
-			data->inference_precision_mode = (enum SL_INFERENCE_PRECISION)bodies.inference_precision_mode;
+			convertBodies(bodies, current_body_tracking_model, data);
+        }
+        return v;
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
 
-            int count = 0;
+sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_Bodies* data, unsigned int instance_id)
+{
+    if (!isNull())
+    {
+        sl::Bodies bodies;
+        cuCtxSetCurrent(zed.getCUDAContext());
 
-            for (auto& p : bodies.body_list) 
-            {
-                if (count < MAX_NUMBER_OBJECT) 
-                {
-                    data->body_list[count].tracking_state = (SL_OBJECT_TRACKING_STATE)p.tracking_state;
-                    data->body_list[count].action_state = (SL_OBJECT_ACTION_STATE)p.action_state;
-                    data->body_list[count].id = p.id;
-                    data->body_list[count].confidence = p.confidence;
+        sl::ERROR_CODE v = zed.retrieveBodies(bodies, instance_id);
+        if (v == sl::ERROR_CODE::SUCCESS)
+        {
+            convertBodies(bodies, current_body_tracking_model, data);
+        }
+        return v;
+    }
+	return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
 
-                    memcpy(data->body_list[count].unique_object_id, p.unique_object_id, 37 * sizeof(char));
+sl::ERROR_CODE ZEDController::setBodyTrackingRuntimeParameters(SL_BodyTrackingRuntimeParameters* body_params, unsigned int instance_id) {
+    if (!isNull()) {
+        sl::ERROR_CODE v;
+        sl::BodyTrackingRuntimeParameters params;
+        params.detection_confidence_threshold = body_params->detection_confidence_threshold;
+        params.minimum_keypoints_threshold = body_params->minimum_keypoints_threshold;
+        params.skeleton_smoothing = body_params->skeleton_smoothing;
 
-                    for (int k = 0; k < 6; k++)
-                        data->body_list[count].position_covariance[k] = p.position_covariance[k];
+        v = zed.setBodyTrackingRuntimeParameters(params, instance_id);
+        return v;
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
 
-                    data->body_list[count].mask = (int*)(new sl::Mat(p.mask));
+sl::ERROR_CODE ZEDController::setObjectDetectionRuntimeParameters(SL_ObjectDetectionRuntimeParameters* object_detection_params, unsigned int instance_id) {
+    if (!isNull()) {
+        sl::ERROR_CODE v;
+        sl::ObjectDetectionRuntimeParameters params;
+        params.detection_confidence_threshold = object_detection_params->detection_confidence_threshold;
 
-                    // 3D Bounding box in world frame
-                    for (int m = 0; m < 8; m++) 
-                    {
-                        if (m < p.bounding_box.size()) 
-                        {
-                            data->body_list[count].bounding_box[m].x = p.bounding_box.at(m).x;
-                            data->body_list[count].bounding_box[m].y = p.bounding_box.at(m).y;
-                            data->body_list[count].bounding_box[m].z = p.bounding_box.at(m).z;
-                        }
-                    }
+        params.object_class_filter = std::vector<sl::OBJECT_CLASS>{};        v = zed.setObjectDetectionRuntimeParameters(params);
+        params.object_class_detection_confidence_threshold = std::map<sl::OBJECT_CLASS, float>{};
+        for (int k = 0; k < (int)sl::OBJECT_CLASS::LAST; k++) {
+            if (object_detection_params->object_class_filter[k]) {
+                params.object_class_filter.push_back(static_cast<sl::OBJECT_CLASS> (k));
+            }
 
-                    for (int l = 0; l < 4; l++) 
-                    {
-                        data->body_list[count].bounding_box_2d[l].x = (float)p.bounding_box_2d.at(l).x;
-                        data->body_list[count].bounding_box_2d[l].y = (float)p.bounding_box_2d.at(l).y;
-                    }
-
-                    for (int l = 0; l < p.head_bounding_box.size(); l++) 
-                    {
-                        data->body_list[count].head_bounding_box[l].x = (float)p.head_bounding_box.at(l).x;
-                        data->body_list[count].head_bounding_box[l].y = (float)p.head_bounding_box.at(l).y;
-                    }
-
-                    for (int l = 0; l < p.head_bounding_box_2d.size(); l++) 
-                    {
-                        data->body_list[count].head_bounding_box_2d[l].x = (float)p.head_bounding_box_2d.at(l).x;
-                        data->body_list[count].head_bounding_box_2d[l].y = (float)p.head_bounding_box_2d.at(l).y;
-                    }
-
-                    // World data
-                    data->body_list[count].position.x = p.position.x;
-                    data->body_list[count].position.y = p.position.y;
-                    data->body_list[count].position.z = p.position.z;
-
-                    data->body_list[count].velocity.x = p.velocity.x;
-                    data->body_list[count].velocity.y = p.velocity.y;
-                    data->body_list[count].velocity.z = p.velocity.z;
-
-                    data->body_list[count].dimensions.x = p.dimensions.x;
-                    data->body_list[count].dimensions.y = p.dimensions.y;
-                    data->body_list[count].dimensions.z = p.dimensions.z;
-
-                    data->body_list[count].head_position.x = p.head_position.x;
-                    data->body_list[count].head_position.y = p.head_position.y;
-                    data->body_list[count].head_position.z = p.head_position.z;
-
-                    for (int i = 0; i < p.keypoint.size(); i++)
-                    {
-                        data->body_list[count].keypoint_2d[i].x = p.keypoint_2d.at(i).x;
-                        data->body_list[count].keypoint_2d[i].y = p.keypoint_2d.at(i).y;
-
-                        data->body_list[count].keypoint[i].x = p.keypoint.at(i).x;
-                        data->body_list[count].keypoint[i].y = p.keypoint.at(i).y;
-                        data->body_list[count].keypoint[i].z = p.keypoint.at(i).z;
-                        data->body_list[count].keypoint_confidence[i] = p.keypoint_confidence.at(i);
-
-                        for (int k = 0; k < 6; k++)
-                        {
-                            data->body_list[count].keypoint_covariances[i][k] = p.keypoint_covariances[i][k];
-                        }
-                    }
-
-                    data->body_list[count].global_root_orientation.x = p.global_root_orientation.x;
-                    data->body_list[count].global_root_orientation.y = p.global_root_orientation.y;
-                    data->body_list[count].global_root_orientation.z = p.global_root_orientation.z;
-                    data->body_list[count].global_root_orientation.w = p.global_root_orientation.w;
-
-                    for (int i = 0; i < p.local_orientation_per_joint.size(); i++) {
-
-                        data->body_list[count].local_orientation_per_joint[i].x = p.local_orientation_per_joint[i].x;
-                        data->body_list[count].local_orientation_per_joint[i].y = p.local_orientation_per_joint[i].y;
-                        data->body_list[count].local_orientation_per_joint[i].z = p.local_orientation_per_joint[i].z;
-                        data->body_list[count].local_orientation_per_joint[i].w = p.local_orientation_per_joint[i].w;
-                            
-                        data->body_list[count].local_position_per_joint[i].x = p.local_position_per_joint[i].x;
-                        data->body_list[count].local_position_per_joint[i].y = p.local_position_per_joint[i].y;
-                        data->body_list[count].local_position_per_joint[i].z = p.local_position_per_joint[i].z;
-                    }
-                }
-                count++;
+            if (object_detection_params->object_confidence_threshold[k]) {
+                params.object_class_detection_confidence_threshold.insert({ static_cast<sl::OBJECT_CLASS> (k), object_detection_params->object_confidence_threshold[k] });
             }
         }
+
+        v = zed.setObjectDetectionRuntimeParameters(params, instance_id);
+
+        return v;
+    }
+    return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
+}
+
+sl::ERROR_CODE ZEDController::setCustomObjectDetectionRuntimeParameters(SL_CustomObjectDetectionRuntimeParameters* custom_object_detection_params, unsigned int instance_id)
+{
+    if (!isNull()) {
+        sl::ERROR_CODE v;
+        sl::Objects objects;
+        cuCtxSetCurrent(zed.getCUDAContext());
+        sl::CustomObjectDetectionRuntimeParameters runtime_params;
+        convert(custom_object_detection_params->object_detection_properties, runtime_params.object_detection_properties);
+        for (unsigned int i = 0; i < custom_object_detection_params->number_custom_detection_properties; ++i) {
+            convert(custom_object_detection_params->object_class_detection_properties[i],
+                runtime_params.object_class_detection_properties[custom_object_detection_params->object_class_detection_properties[i].class_id]);
+        }
+        v = zed.setCustomObjectDetectionRuntimeParameters(runtime_params, instance_id);
         return v;
     }
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;

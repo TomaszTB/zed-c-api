@@ -57,13 +57,15 @@ public:
     enum SL_FUSION_ERROR_CODE unsubscribe(struct SL_CameraIdentifier* uuid);
 
     /**
-     * \brief Updates the specified camera position inside fusion WORLD.
+     * \brief gets the specified camera position inside fusion WORLD.
      * \param uuid: The requested camera identifier.
      * \param pose_translation: The World translation of the camera, regarding the other camera of the setup.
      * \param pose_rotation: The World rotation of the camera, regarding the other camera of the setup.
      * \return \ref FUSION_ERROR_CODE "SUCCESS" if it goes as it should, otherwise it returns an FUSION_ERROR_CODE.
      */
     enum SL_FUSION_ERROR_CODE updatePose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
+
+    enum SL_FUSION_ERROR_CODE getPose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
     
     /**
      * \brief Returns the state of each connected data senders.
@@ -133,7 +135,7 @@ public:
     /// \param [out] bodies: list of bodies seen by all available cameras
     /// \note Only the 3d informations is available in the returned object.
     ///
-    enum SL_FUSION_ERROR_CODE retrieveBodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid);
+    enum SL_FUSION_ERROR_CODE retrieveBodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid, enum SL_FUSION_REFERENCE_FRAME reference_frame);
 
     /////////////////////////////////////////////////////////////////////
     ///////////////////// Positional Tracking Fusion ///////////////////////
@@ -179,6 +181,10 @@ public:
     enum SL_GNSS_FUSION_STATUS geoToCamera(struct SL_LatLng* in, struct SL_PoseData* out, bool radian);
 
     enum SL_GNSS_FUSION_STATUS cameraToGeo(struct SL_PoseData* in, struct SL_GeoPose* out, bool radian);
+
+    enum SL_FUSION_ERROR_CODE enuToGeo(struct SL_ENU* in, struct SL_LatLng* out);
+
+	enum SL_FUSION_ERROR_CODE geoToEnu(struct SL_LatLng* in, struct SL_ENU* out);
 
     enum SL_GNSS_FUSION_STATUS getCurrentGNSSCalibrationSTD(float* yaw_std, struct SL_Vector3* position_std);
 

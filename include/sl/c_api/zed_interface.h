@@ -385,6 +385,14 @@ extern "C" {
     INTERFACE_API void sl_set_svo_position(int camera_id, int frame_number);
 
     /**
+    \brief Pauses or resumes SVO reading
+    \param camera_id : Id of the camera instance.
+    \param status : If true, the reading is paused. If false, the reading is resumed.
+    \note This is only relevant for SVO \ref InitParameters::svo_real_time_mode
+     */
+    INTERFACE_API void sl_pause_svo_reading(int camera_id, bool status);
+
+    /**
     \brief Returns the camera FPS.
     \param camera_id : Id of the camera instance.
     \return The current frame rate.
@@ -1154,7 +1162,7 @@ extern "C" {
     \return \ref SL_ERROR_CODE "SL_ERROR_CODE_INVALID_RESOLUTION" if the resolution is higher than one provided by getCameraInformation().camera_configuration.resolution.
     \return \ref SL_ERROR_CODE "SL_ERROR_CODE_FAILURE" if another error occurred.
      */
-    INTERFACE_API int sl_retrieve_measure(int camera_id, void* measure_ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height, int custream);
+    INTERFACE_API int sl_retrieve_measure(int camera_id, void* measure_ptr, enum SL_MEASURE type, enum SL_MEM mem, int width, int height, cudaStream_t custream);
     /**
     \brief Retrieves an image texture from the ZED SDK in a human-viewable format.
     
@@ -1168,7 +1176,7 @@ extern "C" {
     \param height : Height of the texture in pixel.
     \return \ref SL_ERROR_CODE "SL_ERROR_CODE_SUCCESS" if the retrieve succeeded.
      */
-    INTERFACE_API int sl_retrieve_image(int camera_id, void* image_ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height, int custream);
+    INTERFACE_API int sl_retrieve_image(int camera_id, void* image_ptr, enum SL_VIEW type, enum SL_MEM mem, int width, int height, cudaStream_t custream);
 
     /**
     \brief Convert Image format from Unsigned char to Signed char, designed for Unreal Engine pipeline, works on GPU memory.
@@ -1177,7 +1185,7 @@ extern "C" {
     \param stream : a cuda stream to put the compute to (def. 0)
     \note If the Output Mat does not satisfies the requirements, it is freed and re-allocated.
     */
-    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, int stream);
+    INTERFACE_API int sl_convert_image(void* image_in_ptr, void* image_signed_ptr, cudaStream_t stream);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////// Streaming Sender //////////////////////////////////////////////////////////////////////
@@ -1323,6 +1331,18 @@ extern "C" {
      */
     INTERFACE_API void sl_disable_object_detection(int camera_id, unsigned int instance_id, bool force_disable_all_instances);
 
+
+    /**
+    \brief Set the Object detection module instance runtime parameters
+     By default the object detection module will use the parameters set in the ObjectDetectionRuntimeParameters constructor.
+     This can be changed at any time, however since the processing is done in parallel, the parameters will be used for the next inference.
+     This function can be called only on parameters change, the previous values will be applied during inference.
+    \param camera_id : Id of the camera instance.
+    \param params : ObjectDetectionRuntimeParameters parameters
+    \param instance_id : Object detection instance id, by default the first instance
+    */
+    INTERFACE_API int sl_set_object_detection_runtime_parameters(int camera_id, struct SL_ObjectDetectionRuntimeParameters* object_detection_parameters, unsigned int instance_id);
+
     /**
     \brief Initializes and starts the Deep Learning Body Tracking module.
     
@@ -1365,6 +1385,16 @@ extern "C" {
     \param force_disable_all_instances : Should disable all instances of the tracking module module or just <b>instance_id</b>.
      */
     INTERFACE_API void sl_disable_body_tracking(int camera_id, unsigned int instance_id, bool force_disable_all_instances);
+
+    /**
+    \brief Set the Body tracking module instance runtime parameters
+     By default the Body tracking module will use the parameters set in the BodyTrackingRuntimeParameters constructor.
+     This can be changed at any time, however since the processing is done in parallel, the parameters will be used for the next inference.
+     This function can be called only on parameters change, the previous values will be applied during inference.
+    \param params : BodyTrackingRuntimeParameters parameters
+    \param instance_id : Body tracking instance id, by default the first instance
+    */
+    INTERFACE_API int sl_set_body_tracking_runtime_parameters(int camera_id, struct SL_BodyTrackingRuntimeParameters* body_tracking_parameters, unsigned int instance_id);
 
     /**
     \brief Generate a UUID like unique id to help identify and track AI detections.
@@ -1414,6 +1444,17 @@ extern "C" {
     \return \ref SL_ERROR_CODE "SL_ERROR_CODE_SUCCESS" if everything went fine, \ref SL_ERROR_CODE "SL_ERROR_CODE_FAILURE" otherwise.
      */
     INTERFACE_API int sl_retrieve_custom_objects(int camera_id, struct SL_CustomObjectDetectionRuntimeParameters* object_detection_runtime_parameters, struct SL_Objects* objects, unsigned int instance_id);
+
+    /**
+    \brief Set the Object detection module instance runtime parameters when using the Custom model (OBJECT_DETECTION_MODEL::CUSTOM_BOX_OBJECTS and CUSTOM_BOX_OBJECTS::CUSTOM_YOLOLIKE_BOX_OBJECTS)
+     By default the object detection module will use the parameters set in the CustomObjectDetectionRuntimeParameters constructor.
+     This can be changed at any time, however since the processing is done in parallel, the parameters will be used for the next inference.
+     This function can be called only on parameters change, the previous values will be applied during inference.
+    \param camera_id : Id of the camera instance.
+    \param params : CustomObjectDetectionRuntimeParameters parameters
+    \param instance_id : Object detection instance id, by default the first instance
+    */
+    INTERFACE_API int sl_set_custom_object_detection_runtime_parameters(int camera_id, struct SL_CustomObjectDetectionRuntimeParameters* custom_object_detection_parameters, unsigned int instance_id);
 
     /**
     \brief Retrieve bodies detected by the body tracking module.
@@ -1522,10 +1563,11 @@ extern "C" {
      * \param measure: the requested measure type, by default DEPTH (F32_C1)
      * \param width: the requested width of the output image, can be lower or equal (default) to the original image width.
      * \param height: the requested height of the output image, can be lower or equal (default) to the original image height.
+     *\param reference_frame: the requested reference frame, by default BASELINK. it is only available for fused point clouds
      * \return \ref FUSION_ERROR_CODE "SUCCESS" if it goes as it should, otherwise it returns an FUSION_ERROR_CODE.
      * \note Only MEASURE: DEPTH, XYZ, XYZRGBA, XYZBGRA, XYZARGB, XYZABGR, DEPTH_U16_MM are available.
      */
-    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_retrieve_measure(void* mat, struct SL_CameraIdentifier* uuid, enum SL_MEASURE measure, int width, int height);
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_retrieve_measure(void* mat, struct SL_CameraIdentifier* uuid, enum SL_MEASURE measure, int width, int height, enum SL_FUSION_REFERENCE_FRAME reference_frame);
 
     /**
      * \brief Remove the specified camera from data provider.
@@ -1542,6 +1584,14 @@ extern "C" {
     * \return SL_FUSION_ERROR_CODE
     * */
     INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_update_pose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
+
+    /**
+     * \brief Get the specified camera position inside fusion WORLD.
+     * \param uuid: The requested camera identifier.
+     * \param pose: The World position of the camera, regarding the other camera of the setup.
+     * \return \ref FUSION_ERROR_CODE "SUCCESS" if it goes as it should, otherwise it returns an FUSION_ERROR_CODE.
+     */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_get_pose(struct SL_CameraIdentifier* uuid, struct SL_Vector3* pose_translation, struct SL_Quaternion* pose_rotation);
     
     /*
     * \brief Returns the state of a connected data sender.
@@ -1592,10 +1642,11 @@ extern "C" {
     * \brief retrieves a list of bodies (in SL_Bodies class type) seen by all cameras and merged as if it was seen by a single super-camera.
     *\note Internal calls retrieveBodies() for all listed cameras, then merged into a single SL_Bodies
     * \param [out] bodies: list of bodies seen by all available cameras
+    * \param reference_frame: The reference frame in which the objects will be expressed.
     * \note Only the 3d informations is available in the returned object.
     * \return SL_FUSION_ERROR_CODE
     */
-    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_retrieve_bodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid);
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_retrieve_bodies(struct SL_Bodies* bodies, struct SL_BodyTrackingFusionRuntimeParameters* rt, struct SL_CameraIdentifier uuid, enum SL_FUSION_REFERENCE_FRAME reference_frame);
 
     /**
      * \brief get the stats of a given camera in the Fusion API side
@@ -1644,6 +1695,22 @@ extern "C" {
     /////////////////////////////////////////////////////////////////////
     /////////////////////////// GNSS Fusion /////////////////////////////
     /////////////////////////////////////////////////////////////////////
+
+    /**
+     * @brief Convert a ENU position expressed inside the Fusion coordinate system to a global world coordinate.
+     * \param in Input enu coordinate.
+     * \param out Converted position in lat/lng coordinate system.
+     * \return ERROR_CODE FAILURE if the conversion failed, SUCCESS otherwise.
+     */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_enu_to_geo(struct SL_ENU* in, struct SL_LatLng* out);
+
+    /**
+     * @brief Convert a global world coordinate to a ENU position expressed inside the Fusion coordinate system.
+     * \param in Input lat/lng coordinate.
+     * \param out Converted position in ENU coordinate system.
+     * \return ERROR_CODE FAILURE if the conversion failed, SUCCESS otherwise.
+     */
+    INTERFACE_API enum SL_FUSION_ERROR_CODE sl_fusion_geo_to_enu(struct SL_LatLng* in, struct SL_ENU* out);
 
     /**
      * \brief Add GNSS that will be used by fusion for computing fused pose.
@@ -2137,14 +2204,14 @@ extern "C" {
     \brief Convert the color channels of the Mat (RGB<->BGR or RGBA<->BGRA)
      * This methods works only on 8U_C4 or 8U_C3
      */
-    INTERFACE_API int sl_mat_convert_color(void* ptr, enum SL_MEM memory, bool swap_RB_channels, int stream);
+    INTERFACE_API int sl_mat_convert_color(void* ptr, enum SL_MEM memory, bool swap_RB_channels, cudaStream_t stream);
 
     /**
     \brief Convert the color channels of the Mat into another Mat
      * This methods works only on 8U_C4 if remove_alpha_channels is enabled, or 8U_C4 and 8U_C3 if swap_RB_channels is enabled
      * The inplace method sl::Mat::convertColor can be used for only swapping the Red and Blue channel efficiently
      */
-    INTERFACE_API int sl_convert_color(void* mat1, void* mat2, bool swap_RB_channels, bool remove_alpha_channels, enum SL_MEM memory, int stream);
+    INTERFACE_API int sl_convert_color(void* mat1, void* mat2, bool swap_RB_channels, bool remove_alpha_channels, enum SL_MEM memory, cudaStream_t stream);
 
     /**
     \brief Convert an image into a GPU Tensor in planar channel configuration (NCHW), ready to use for deep learning model
@@ -2160,7 +2227,7 @@ extern "C" {
      */
     INTERFACE_API int sl_blob_from_image(void* image_in, void* tensor_out, struct SL_Resolution resolution_out,
         float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels,
-        int stream);
+        cudaStream_t stream);
 
     /**
     \brief Convert a list of images into a GPU Tensor in planar channel configuration (NCHW), ready to use for deep learning model
@@ -2178,7 +2245,7 @@ extern "C" {
 
 	INTERFACE_API int sl_blob_from_images(void** image_in, int nb_images, void* tensor_out, struct SL_Resolution resolution_out,
 		float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels,
-		int stream);
+		cudaStream_t stream);
 
 #ifdef __cplusplus
 }

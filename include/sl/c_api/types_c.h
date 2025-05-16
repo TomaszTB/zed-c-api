@@ -3949,6 +3949,14 @@ enum SL_GNSS_FUSION_STATUS {
 };
 
 /**
+ * \brief Enum to define the reference frame of the fusion SDK.
+ */
+enum SL_FUSION_REFERENCE_FRAME {
+	SL_FUSION_REFERENCE_FRAME_WORLD = 0, /**< The world frame is the reference frame of the world according to the fused positional Tracking*/
+	SL_FUSION_REFERENCE_FRAME_BASELINK = 1, /**< The base link frame is the reference frame where camera calibration is given*/
+};
+
+/**
  \brief Class containing the overall position fusion status
  */
 struct SL_FusedPositionalTrackingStatus
@@ -4137,6 +4145,18 @@ struct SL_InitFusionParameters
 	 * The SynchronizationParameter struct encapsulates the synchronization parameters that control the data fusion process.
 	 */
 	struct SL_SynchronizationParameter synchronization_parameters; 
+
+	/**
+	* \brief Sets the maximum resolution for all Fusion outputs, such as images and measures.
+	*
+	* The default value is (-1, -1), which allows the Fusion to automatically select the optimal resolution for the best quality/runtime ratio.
+	*
+	* - For images, the output resolution can be up to the native resolution of the camera.
+	* - For measures involving depth, the output resolution can be up to the maximum working resolution.
+	*
+	* Setting this parameter to (-1, -1) will ensure the best balance between quality and performance for depth measures.
+	*/
+	struct SL_Resolution maximum_working_resolution;
 };
 
 /**
@@ -4431,6 +4451,29 @@ struct SL_UTM
 };
 
 /**
+ * \brief Represents a world position in ENU format.
+ *
+ */
+struct SL_ENU
+{
+	/**
+	 * @brief East coordinate.
+	 *
+	 */
+	double east;
+	/**
+	 * @brief North coordinate.
+	 *
+	 */
+	double north;
+	/**
+	 * @brief Up coordinate.
+	 *
+	 */
+	double up;
+};
+
+/**
  * \brief Holds the options used for calibrating GNSS / VIO.
 */
 struct SL_GNSSCalibrationParameters {
@@ -4523,7 +4566,11 @@ struct SL_PositionalTrackingFusionParameters {
 	 * \brief Whether to override 2 of the 3 rotations from \ref base_footprint_to_world_transform using the IMU gravity.
 	 */
 	bool set_gravity_as_origin;
-
+	/**
+	 * \brief ID of the camera used for positional tracking. If not specified, will use the first camera called with the subscribe() method.
+	 *
+	 */
+	struct SL_CameraIdentifier tracking_camera_id;
 };
 
 #if 0
