@@ -78,6 +78,7 @@ public:
     int initFromSVO(SL_InitParameters *params, const char* pathSVO, const char* outputFile, const char* opt_settings_path, const char* opencv_calib_path);
     int initFromStream(SL_InitParameters *params, const char* ip, int port, const char* outputFile, const char* opt_settings_path, const char* opencv_calib_path);
     int initFromGMSL(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
+    int initFromLive(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path);
 
     sl::POSITIONAL_TRACKING_STATE getPoseArray(float* pose, int mat_type);
 
@@ -208,9 +209,9 @@ public:
     SL_BodyTrackingParameters* getBodyTrackingParameters();
     void disableObjectDetection(unsigned int instance_id, bool force_disable_all_instances);
     void disableBodyTracking(unsigned int instance_id, bool force_disable_all_instances);
-    sl::ERROR_CODE setBodyTrackingRuntimeParameters(SL_BodyTrackingRuntimeParameters* body_params, unsigned int instance_id);
-    sl::ERROR_CODE setObjectDetectionRuntimeParameters(SL_ObjectDetectionRuntimeParameters* object_detection_params, unsigned int instance_id);
-    sl::ERROR_CODE setCustomObjectDetectionRuntimeParameters(SL_CustomObjectDetectionRuntimeParameters* custom_object_detection_params, unsigned int instance_id);
+    sl::ERROR_CODE setBodyTrackingRuntimeParameters(SL_BodyTrackingRuntimeParameters body_params, unsigned int instance_id);
+    sl::ERROR_CODE setObjectDetectionRuntimeParameters(SL_ObjectDetectionRuntimeParameters object_detection_params, unsigned int instance_id);
+    sl::ERROR_CODE setCustomObjectDetectionRuntimeParameters(SL_CustomObjectDetectionRuntimeParameters custom_object_detection_params, unsigned int instance_id);
     sl::ERROR_CODE ingestCustomBoxObjectData(int nb_objects, SL_CustomBoxObjectData* objects_in, unsigned int instance_id);
     sl::ERROR_CODE ingestCustomMaskObjectData(int nb_objects, SL_CustomMaskObjectData* objects_in, unsigned int instance_id);
     sl::ERROR_CODE retrieveObjectDetectionData(SL_ObjectDetectionRuntimeParameters* objruntimeparams, SL_Objects* data, unsigned int instance_id); 

@@ -73,7 +73,7 @@ else(MSVC)
 						${CUDA_CUDA_LIBRARY}
 						gomp
 						pthread
-						usb
+						usb-1.0
 					)
 
 	##install

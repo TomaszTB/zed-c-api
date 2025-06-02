@@ -155,14 +155,34 @@ int ZEDController::initFromGMSL(SL_InitParameters* params, const unsigned int se
         return 0;
     }
     sprintf(buffer_verbose, "ENTER ZEDController::initFromGMSL %d = %d", params->camera_device_id, camera_ID);
-    initParams.camera_resolution = (sl::RESOLUTION)params->resolution;
+    copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
+
     if (serial_number > 0) {
         initParams.input.setFromSerialNumber(serial_number, sl::BUS_TYPE::GMSL);
     }
     else {
         initParams.input.setFromCameraID(params->camera_device_id, sl::BUS_TYPE::GMSL);
     }
+
+    return open();
+
+}
+
+int ZEDController::initFromLive(SL_InitParameters* params, const unsigned int serial_number, const char* output_file, const char* opt_settings_path, const char* opencv_calib_path)
+{
+    char buffer_verbose[2048];
+    if (cameraOpened) {
+        sprintf(buffer_verbose, "[initFromLive] Camera already opened %d = %d return success", params->camera_device_id, camera_ID);
+        return 0;
+    }
+    sprintf(buffer_verbose, "ENTER ZEDController::initFromLive %d = %d", params->camera_device_id, camera_ID);
     copy_init_parameters(initParams, params, output_file, opt_settings_path, opencv_calib_path);
+    if (serial_number > 0) {
+        initParams.input.setFromSerialNumber(serial_number, sl::BUS_TYPE::AUTO);
+    }
+    else {
+        initParams.input.setFromCameraID(params->camera_device_id, sl::BUS_TYPE::AUTO);
+    }
 
     return open();
 
@@ -2446,13 +2466,13 @@ sl::ERROR_CODE ZEDController::retrieveBodyTrackingData(SL_Bodies* data, unsigned
 	return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
-sl::ERROR_CODE ZEDController::setBodyTrackingRuntimeParameters(SL_BodyTrackingRuntimeParameters* body_params, unsigned int instance_id) {
+sl::ERROR_CODE ZEDController::setBodyTrackingRuntimeParameters(SL_BodyTrackingRuntimeParameters body_params, unsigned int instance_id) {
     if (!isNull()) {
         sl::ERROR_CODE v;
         sl::BodyTrackingRuntimeParameters params;
-        params.detection_confidence_threshold = body_params->detection_confidence_threshold;
-        params.minimum_keypoints_threshold = body_params->minimum_keypoints_threshold;
-        params.skeleton_smoothing = body_params->skeleton_smoothing;
+        params.detection_confidence_threshold = body_params.detection_confidence_threshold;
+        params.minimum_keypoints_threshold = body_params.minimum_keypoints_threshold;
+        params.skeleton_smoothing = body_params.skeleton_smoothing;
 
         v = zed.setBodyTrackingRuntimeParameters(params, instance_id);
         return v;
@@ -2460,21 +2480,21 @@ sl::ERROR_CODE ZEDController::setBodyTrackingRuntimeParameters(SL_BodyTrackingRu
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
-sl::ERROR_CODE ZEDController::setObjectDetectionRuntimeParameters(SL_ObjectDetectionRuntimeParameters* object_detection_params, unsigned int instance_id) {
+sl::ERROR_CODE ZEDController::setObjectDetectionRuntimeParameters(SL_ObjectDetectionRuntimeParameters object_detection_params, unsigned int instance_id) {
     if (!isNull()) {
         sl::ERROR_CODE v;
         sl::ObjectDetectionRuntimeParameters params;
-        params.detection_confidence_threshold = object_detection_params->detection_confidence_threshold;
+        params.detection_confidence_threshold = object_detection_params.detection_confidence_threshold;
 
         params.object_class_filter = std::vector<sl::OBJECT_CLASS>{};        v = zed.setObjectDetectionRuntimeParameters(params);
         params.object_class_detection_confidence_threshold = std::map<sl::OBJECT_CLASS, float>{};
         for (int k = 0; k < (int)sl::OBJECT_CLASS::LAST; k++) {
-            if (object_detection_params->object_class_filter[k]) {
+            if (object_detection_params.object_class_filter[k]) {
                 params.object_class_filter.push_back(static_cast<sl::OBJECT_CLASS> (k));
             }
 
-            if (object_detection_params->object_confidence_threshold[k]) {
-                params.object_class_detection_confidence_threshold.insert({ static_cast<sl::OBJECT_CLASS> (k), object_detection_params->object_confidence_threshold[k] });
+            if (object_detection_params.object_confidence_threshold[k]) {
+                params.object_class_detection_confidence_threshold.insert({ static_cast<sl::OBJECT_CLASS> (k), object_detection_params.object_confidence_threshold[k] });
             }
         }
 
@@ -2485,17 +2505,17 @@ sl::ERROR_CODE ZEDController::setObjectDetectionRuntimeParameters(SL_ObjectDetec
     return sl::ERROR_CODE::CAMERA_NOT_DETECTED;
 }
 
-sl::ERROR_CODE ZEDController::setCustomObjectDetectionRuntimeParameters(SL_CustomObjectDetectionRuntimeParameters* custom_object_detection_params, unsigned int instance_id)
+sl::ERROR_CODE ZEDController::setCustomObjectDetectionRuntimeParameters(SL_CustomObjectDetectionRuntimeParameters custom_object_detection_params, unsigned int instance_id)
 {
     if (!isNull()) {
         sl::ERROR_CODE v;
         sl::Objects objects;
         cuCtxSetCurrent(zed.getCUDAContext());
         sl::CustomObjectDetectionRuntimeParameters runtime_params;
-        convert(custom_object_detection_params->object_detection_properties, runtime_params.object_detection_properties);
-        for (unsigned int i = 0; i < custom_object_detection_params->number_custom_detection_properties; ++i) {
-            convert(custom_object_detection_params->object_class_detection_properties[i],
-                runtime_params.object_class_detection_properties[custom_object_detection_params->object_class_detection_properties[i].class_id]);
+        convert(custom_object_detection_params.object_detection_properties, runtime_params.object_detection_properties);
+        for (unsigned int i = 0; i < custom_object_detection_params.number_custom_detection_properties; ++i) {
+            convert(custom_object_detection_params.object_class_detection_properties[i],
+                runtime_params.object_class_detection_properties[custom_object_detection_params.object_class_detection_properties[i].class_id]);
         }
         v = zed.setCustomObjectDetectionRuntimeParameters(runtime_params, instance_id);
         return v;

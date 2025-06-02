@@ -400,6 +400,8 @@ void ZEDFusionController::readFusionConfigFile(const char* json_config_filename,
 
 			fusion_config.position = position;
 			fusion_config.rotation = rotation;
+			
+			fusion_config.override_gravity = sdk_config.override_gravity;
 
 			fusion_config.input_type = getInput(sdk_config.input_type.getType(), sdk_config.input_type.getConfiguration());
 			fusion_config.comm_param.communication_type = (SL_COMM_TYPE)sdk_config.communication_parameters.getType();
@@ -440,6 +442,8 @@ void ZEDFusionController::readFusionConfig(const char* fusion_configuration, enu
 
 			fusion_config.position = position;
 			fusion_config.rotation = rotation;
+
+			fusion_config.override_gravity = sdk_config.override_gravity;
 
 			fusion_config.input_type = getInput(sdk_config.input_type.getType(), sdk_config.input_type.getConfiguration());
 			fusion_config.comm_param.communication_type = (SL_COMM_TYPE)sdk_config.communication_parameters.getType();
