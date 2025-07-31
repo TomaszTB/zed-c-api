@@ -4339,6 +4339,16 @@ struct SL_GNSSData
 	 *
 	 */
 	double altitude_std;
+	/**
+	* \brief GNSS status of the data.
+	*
+	*/
+	enum SL_GNSS_STATUS gnss_status;
+	/**
+	* \brief GNSS mode of the data.
+	*
+	*/
+	enum SL_GNSS_MODE gnss_mode;
 };
 
 /**

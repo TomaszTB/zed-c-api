@@ -2247,33 +2247,33 @@ extern "C" {
 		float scalefactor, struct SL_Vector3 mean, struct SL_Vector3 stddev, bool keep_aspect_ratio, bool swap_RB_channels,
         void* stream);
 
-    ///**
-    //\brief Check if the camera is a ZED One (Monocular) or ZED (Stereo)
-    //\param m : Camera model
-    //*/
-    //INTERFACE_API bool sl_is_camera_one(enum SL_MODEL m);
+    /**
+    \brief Check if the camera is a ZED One (Monocular) or ZED (Stereo)
+    \param m : Camera model
+    */
+    INTERFACE_API bool sl_is_camera_one(enum SL_MODEL m);
 
-    ///**
-    //\brief Check if a resolution is available for a given camera model
-    //\param r : Resolution to check
-    //\param m : Camera model
-    //*/
-    //INTERFACE_API bool sl_is_resolution_available(enum SL_RESOLUTION r, enum SL_MODEL m);
+    /**
+    \brief Check if a resolution is available for a given camera model
+    \param r : Resolution to check
+    \param m : Camera model
+    */
+    INTERFACE_API bool sl_is_resolution_available(enum SL_RESOLUTION r, enum SL_MODEL m);
 
-    ///**
-    //\brief Check if a frame rate is available for a given resolution and camera model
-    //\param fps : Frame rate to check
-    //\param r : Resolution to check
-    //\param m : Camera model
-    //*/
-    //INTERFACE_API bool sl_is_FPS_available(int fps, enum SL_RESOLUTION r, enum SL_MODEL m);
+    /**
+    \brief Check if a frame rate is available for a given resolution and camera model
+    \param fps : Frame rate to check
+    \param r : Resolution to check
+    \param m : Camera model
+    */
+    INTERFACE_API bool sl_is_FPS_available(int fps, enum SL_RESOLUTION r, enum SL_MODEL m);
 
-    ///**
-    //\brief Check if a resolution for a given camera model is available for HDR
-    //\param r : Resolution to check
-    //\param m : Camera model
-    //*/
-    //INTERFACE_API bool sl_is_HDR_available(enum SL_RESOLUTION r, enum SL_MODEL m);
+    /**
+    \brief Check if a resolution for a given camera model is available for HDR
+    \param r : Resolution to check
+    \param m : Camera model
+    */
+    INTERFACE_API bool sl_is_HDR_available(enum SL_RESOLUTION r, enum SL_MODEL m);
 
 
 #ifdef __cplusplus

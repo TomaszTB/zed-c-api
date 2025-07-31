@@ -537,6 +537,8 @@ SL_FUSION_ERROR_CODE ZEDFusionController::ingestGNSSData(struct SL_GNSSData* dat
 	sdk_gnss.latitude_std = data->latitude_std;
 	sdk_gnss.ts = data->ts;
 
+	sdk_gnss.gnss_status = (sl::GNSS_STATUS)data->gnss_status;
+	sdk_gnss.gnss_mode = (sl::GNSS_MODE)data->gnss_mode;
 	for (int i = 0; i < 9; i++)
 	{
 		sdk_gnss.position_covariance[i] = data->position_covariance[i];

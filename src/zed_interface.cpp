@@ -110,9 +110,6 @@ extern "C" {
         else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::STREAM) {
             err = ZEDController::get(id)->initFromStream(init_parameters, ip, stream_port, output_file, opt_settings_path, opencv_calib_path);
         }
-        else if (init_parameters->input_type == (SL_INPUT_TYPE)sl::INPUT_TYPE::GMSL) {
-            err = ZEDController::get(id)->initFromGMSL(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
-        }
         else
         {
             err = ZEDController::get(id)->initFromLive(init_parameters, serial_number, output_file, opt_settings_path, opencv_calib_path);
@@ -2002,28 +1999,28 @@ extern "C" {
 		return res;
     }
     
-    //INTERFACE_API bool sl_is_camera_one(enum SL_MODEL m){
-    //    auto model = static_cast<sl::MODEL>(m);
-    //    return sl::isCameraOne(model);
-    //}
+    INTERFACE_API bool sl_is_camera_one(enum SL_MODEL m){
+        auto model = static_cast<sl::MODEL>(m);
+        return sl::isCameraOne(model);
+    }
 
-    //INTERFACE_API bool sl_is_resolution_available(enum SL_RESOLUTION r, enum SL_MODEL m){
-    //    auto model = static_cast<sl::MODEL>(m);
-    //    auto res = static_cast<sl::RESOLUTION>(r);
-    //    return sl::isAvailable(res, model);
-    //}
+    INTERFACE_API bool sl_is_resolution_available(enum SL_RESOLUTION r, enum SL_MODEL m){
+        auto model = static_cast<sl::MODEL>(m);
+        auto res = static_cast<sl::RESOLUTION>(r);
+        return sl::isAvailable(res, model);
+    }
 
-    //INTERFACE_API bool sl_is_FPS_available(int fps, enum SL_RESOLUTION r, enum SL_MODEL m){
-    //    auto model = static_cast<sl::MODEL>(m);
-    //    auto res = static_cast<sl::RESOLUTION>(r);
-    //    return sl::isAvailable(fps, res, model);
-    //}
+    INTERFACE_API bool sl_is_FPS_available(int fps, enum SL_RESOLUTION r, enum SL_MODEL m){
+        auto model = static_cast<sl::MODEL>(m);
+        auto res = static_cast<sl::RESOLUTION>(r);
+        return sl::isAvailable(fps, res, model);
+    }
 
-    //INTERFACE_API bool sl_is_HDR_available(enum SL_RESOLUTION r, enum SL_MODEL m){
-    //    auto model = static_cast<sl::MODEL>(m);
-    //    auto res = static_cast<sl::RESOLUTION>(r);
-    //    return sl::supportHDR(res, model);        
-    //}
+    INTERFACE_API bool sl_is_HDR_available(enum SL_RESOLUTION r, enum SL_MODEL m){
+        auto model = static_cast<sl::MODEL>(m);
+        auto res = static_cast<sl::RESOLUTION>(r);
+        return sl::supportHDR(res, model);        
+    }
 
 #ifdef __cplusplus
 }
